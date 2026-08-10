@@ -10,7 +10,7 @@ The migration input of record is the external `../data/hokkaido_places_master.js
 - `data/candidate_research_schema.md` — research and append-only merge contract.
 - `data/research_batches_level1.json` — 10 exact-ID Level 1 batches.
 - `data/candidate_locations.json` — separate technical coordinate overlay; all 77 Candidates have Google Maps-verified coordinates. The 42 historical points are preserved, and 35 newer points were verified on 2026-08-10.
-- `data/candidate_regions.json` — front-end city/area grouping overlay: 26 city/area entities, default exact-ID Candidate membership, and region map centres derived from verified child Candidate points.
+- `data/google_maps_area_catalog.json` — 20 Google Maps-verified city/area search entities. It is a search catalog only: no area is pre-added and no Candidate is pre-assigned.
 - `data/google_maps_coordinate_review_current.json` — title, address, prefecture, coordinate, Place ID, query, scope, and automated cross-check evidence for the 35 newer points.
 - `data/routes.json` — stable-ID route container, currently intentionally unplanned.
 - `data/history/` — former flat 42-record canonical, former schema, and coordinate-review artifacts. Historical only.
@@ -45,7 +45,7 @@ Apply copies the original delta to `research_archive/level1_applied/`, leaves th
 
 The web layer uses `web/data-adapter.js` to convert the nested canonical schema plus the coordinate, region, and batch overlays into display view-models. Unknown values are legal and render as `未研究`, `unknown`, or `L1 pending`.
 
-The existing `按地区查看` view is the default Candidate entry point. It groups Candidates into city/area cards, opens all children in one detail sheet, supports batch Candidate itinerary changes and batch/manual Candidate reassignment, and lets a city/area be added to the itinerary as a ⭐ map marker. `全部 Candidates` always shows all 77 Candidates, including those assigned to a city/area. Manual assignments and itinerary selections are browser-local preferences and never rewrite the research canonical or region overlay.
+The map-first planner starts with an empty `我的地区` list. A user searches the verified Google Maps city/area catalog, previews a result, and explicitly adds it to the trip as a ⭐ marker. New areas contain zero Candidates. Candidates are added only through the searchable multi-select picker, remain visible in the complete 77-item library, and can belong to at most one user-created area. Selecting an area zooms the map and reveals its type-colored Candidate markers; the area card exposes a one-click Candidate expand/collapse control. Area order, dates, nights, notes, and membership are browser-local preferences and never rewrite research data.
 
 The detail view includes Identity, 30-second preview, actual activity steps, Sep 5–18 reality, Temporal Experience Profile, practical constraints, disappointment risks, visual evidence, evidence/provenance, and research gaps. Filters cover normalized category, region, L1 status, L1 batch, trip-window fit, dynamic recheck, visual evidence, and uncertainty. Historical scores are labelled historical and are not ranking logic.
 
@@ -61,12 +61,12 @@ Then open `http://localhost:8000/web/`.
 
 ```powershell
 python scripts/build_candidate_locations.py
-python scripts/build_candidate_regions.py
+python scripts/build_google_maps_area_catalog.py
 python scripts/validate_data.py --external-master ..\data\hokkaido_places_master.json
 python scripts/test_project.py
 ```
 
-`scripts/validate_data.py` checks the current counts, nine legal categories, roles, status rules, exact-once batch coverage, distinct Kushiro restaurants, location overlay integrity, 26 city/area groups with exact-once Candidate coverage, and stable route references. The optional external-master argument confirms that the migration mirror still equals the authoritative external input. GitHub Actions runs structural validation, project tests, JSON parsing, and JavaScript syntax checks on pushes and pull requests.
+`scripts/validate_data.py` checks the current counts, nine legal categories, roles, status rules, exact-once batch coverage, distinct Kushiro restaurants, location overlay integrity, the unassigned Google Maps area-search catalog, and stable route references. The optional external-master argument confirms that the migration mirror still equals the authoritative external input. GitHub Actions runs structural validation, project tests, JSON parsing, and JavaScript syntax checks on pushes and pull requests.
 
 ## Non-goals for Phase A
 

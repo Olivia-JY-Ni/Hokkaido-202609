@@ -3,77 +3,104 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>北海道 · Candidate Experience 研究地图</title>
-  <meta name="description" content="Hokkaido 2026 September Trip 的长期 Candidate Experience 研究数据库与交互地图">
+  <title>Hokkaido 2026 · 旅行地图</title>
+  <meta name="description" content="Hokkaido 2026 September Trip 地区与 Candidate 旅行规划地图">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260810-2">
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <p class="eyebrow">HOKKAIDO · 05—18 SEP 2026</p>
-      <h1>Candidate Experience 研究地图</h1>
+  <header class="app-header">
+    <div class="brand-block">
+      <span class="brand-mark">H</span>
+      <div><h1>Hokkaido 2026</h1><p>9月5日—18日 · 旅行地图</p></div>
     </div>
-    <div class="summary" aria-live="polite">
-      <strong id="visibleCount">—</strong><span>当前候选</span>
-      <strong id="markerCount">—</strong><span>地图标记</span>
-      <strong id="itineraryCount">—</strong><span>⭐ 行程区域</span>
+    <div class="header-stats" aria-live="polite">
+      <span><strong id="areaCount">0</strong> 个地区</span>
+      <span><strong id="assignedCount">0</strong> / 77 Candidates</span>
     </div>
   </header>
 
-  <nav class="view-tabs" aria-label="地图图层">
-    <button class="tab" data-view="all">全部 Candidates</button>
-    <button class="tab active" data-view="regions">按地区查看</button>
-    <span id="routeTabs"></span>
-  </nav>
+  <main class="planner-shell">
+    <aside class="planner-panel" aria-label="行程规划">
+      <nav class="panel-tabs" aria-label="规划内容">
+        <button class="panel-tab active" data-view="areas">我的地区</button>
+        <button class="panel-tab" data-view="candidates">全部 Candidates</button>
+      </nav>
 
-  <main class="workspace">
-    <aside class="filters" aria-label="研究筛选">
-      <div class="filter-heading">
-        <h2>研究筛选</h2>
-        <button id="resetFilters" class="text-button">重置</button>
-      </div>
-      <label>搜索<input id="search" type="search" placeholder="名称、ID、地区、体验内容"></label>
-      <div class="filter-grid">
-        <label>Normalized category<select id="category"><option value="">全部</option></select></label>
-        <label>Region<select id="region"><option value="">全部</option></select></label>
-        <label>L1 status<select id="l1Status"><option value="">全部</option></select></label>
-        <label>L1 batch<select id="l1Batch"><option value="">全部</option></select></label>
-        <label>Trip-window fit<select id="tripWindowFit"><option value="">全部</option></select></label>
-      </div>
-      <fieldset>
-        <legend>研究状态</legend>
-        <label class="check"><input type="checkbox" id="dynamicRecheck"> 需要动态复核</label>
-        <label class="check"><input type="checkbox" id="visualEvidence"> 已有视觉证据</label>
-        <label class="check"><input type="checkbox" id="uncertainty"> 存在明确不确定项</label>
-      </fieldset>
-      <fieldset>
-        <legend>类别快捷筛选</legend>
-        <div id="typeChips" class="chips"></div>
-      </fieldset>
-      <p class="filter-note">“按地区查看”是默认入口。Candidate 的人工归属与行程选择只保存在当前浏览器，不改写研究主数据。</p>
+      <section id="areasView" class="panel-view active">
+        <div class="panel-heading">
+          <div><p class="section-kicker">TRIP STOPS</p><h2>我的地区</h2></div>
+          <span id="areaRailCount" class="count-badge">0</span>
+        </div>
+        <p class="panel-intro">搜索市或地区并加入行程。地区不会自动带入任何 Candidate。</p>
+        <div id="areaList" class="area-list"></div>
+      </section>
+
+      <section id="candidatesView" class="panel-view">
+        <div class="panel-heading">
+          <div><p class="section-kicker">PLACE LIBRARY</p><h2>全部 Candidates</h2></div>
+          <span id="candidateRailCount" class="count-badge">77</span>
+        </div>
+        <div class="candidate-tools">
+          <label class="compact-search"><span aria-hidden="true">⌕</span><input id="candidateSearch" type="search" placeholder="搜索 Candidate"></label>
+          <select id="candidateCategory" aria-label="按类型筛选"><option value="">全部类型</option></select>
+          <label class="inline-check"><input id="candidateUnassignedOnly" type="checkbox"> 只看未归属</label>
+        </div>
+        <div id="candidateList" class="candidate-list"></div>
+      </section>
     </aside>
 
-    <section class="map-stage" aria-label="地图">
-      <div id="map"></div>
-      <div id="mapNotice" class="map-notice" hidden></div>
-      <div class="legend" id="legend"></div>
-    </section>
+    <section class="map-stage" aria-label="旅行地图">
+      <div class="map-search-wrap">
+        <div class="map-search-box">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <input id="areaSearch" type="search" autocomplete="off" placeholder="搜索 Google Maps 市 / 地区">
+          <button id="clearAreaSearch" class="icon-button" aria-label="清除地区搜索" hidden>×</button>
+        </div>
+        <div id="areaSearchResults" class="search-results" hidden></div>
+      </div>
 
-    <section class="candidate-rail" aria-label="候选地点列表">
-      <div class="rail-heading"><h2>候选体验</h2><span id="railCount"></span></div>
-      <div id="candidateList" class="candidate-list"></div>
+      <div class="map-layer-controls" aria-label="地图图层">
+        <button id="toggleAreaLayer" class="layer-pill active"><span>⭐</span> 地区</button>
+        <button id="toggleCandidateLayer" class="layer-pill"><span class="multi-dot">●</span> Candidates</button>
+      </div>
+
+      <div id="map"></div>
+      <article id="placePreview" class="place-preview" hidden></article>
+      <article id="mapFocusCard" class="map-focus-card" hidden></article>
+      <div id="mapLegend" class="map-legend" hidden></div>
     </section>
   </main>
 
+  <aside id="candidatePicker" class="candidate-picker" aria-hidden="true" aria-label="添加 Candidates">
+    <div class="picker-header">
+      <div><p class="section-kicker">ADD TO AREA</p><h2 id="pickerTitle">添加 Candidates</h2></div>
+      <button id="closePicker" class="round-button" aria-label="关闭 Candidate 选择">×</button>
+    </div>
+    <div class="picker-toolbar">
+      <label class="compact-search"><span aria-hidden="true">⌕</span><input id="pickerSearch" type="search" placeholder="搜索名称、ID 或内容"></label>
+      <div class="picker-filter-row">
+        <select id="pickerCategory" aria-label="按 Candidate 类型筛选"><option value="">全部类型</option></select>
+        <label class="inline-check"><input id="pickerUnassignedOnly" type="checkbox"> 只看未归属</label>
+      </div>
+      <button id="selectAllPicker" class="text-action">选择当前结果</button>
+    </div>
+    <div id="pickerCandidateList" class="picker-list"></div>
+    <div class="picker-footer">
+      <span id="pickerSelectionCount">已选择 0</span>
+      <button id="savePicker" class="primary-button">保存到地区</button>
+    </div>
+  </aside>
+  <div id="drawerScrim" class="drawer-scrim" hidden></div>
+
   <dialog id="detailDialog" class="detail-dialog">
-    <button id="closeDetail" class="close-button" aria-label="关闭详情">×</button>
+    <button id="closeDetail" class="round-button detail-close" aria-label="关闭 Candidate 详情">×</button>
     <article id="detailContent"></article>
   </dialog>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="data-adapter.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=20260810-2"></script>
 </body>
 </html>

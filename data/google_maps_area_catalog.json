@@ -1,0 +1,326 @@
+{
+  "schema_version": "1.0.0",
+  "provider": "Google Maps",
+  "policy": "Search catalog only. No place is in the itinerary and no Candidate is assigned by default.",
+  "places": [
+    {
+      "place_id": "ChIJMzaXWnXUCl8R1bqHRp1-kzM",
+      "name_zh": "札幌",
+      "google_title": "札幌市",
+      "formatted_address": "日本、北海道札幌市",
+      "lat": 43.0617713,
+      "lon": 141.3544507,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T17:59:09+08:00",
+      "search_terms": [
+        "札幌",
+        "札幌市",
+        "札幌市 北海道"
+      ]
+    },
+    {
+      "place_id": "ChIJO3nvmK7fCl8RodlajWJ7Pgo",
+      "name_zh": "小樽",
+      "google_title": "小樽市",
+      "formatted_address": "日本、北海道小樽市",
+      "lat": 43.1902372,
+      "lon": 140.994172,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T17:59:11+08:00",
+      "search_terms": [
+        "小樽",
+        "小樽市",
+        "小樽市 北海道"
+      ]
+    },
+    {
+      "place_id": "ChIJO-USq4MmdV8RYREnMTSMkns",
+      "name_zh": "千岁",
+      "google_title": "千歳市",
+      "formatted_address": "日本、北海道千歳市",
+      "lat": 42.82128669999999,
+      "lon": 141.6510125,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T17:59:14+08:00",
+      "search_terms": [
+        "千岁",
+        "千歳市",
+        "千歳市 北海道"
+      ]
+    },
+    {
+      "place_id": "ChIJiSKzxdUZdV8RDVulphgOYG4",
+      "name_zh": "苫小牧",
+      "google_title": "苫小牧市",
+      "formatted_address": "日本、北海道苫小牧市",
+      "lat": 42.63124639999999,
+      "lon": 141.6031222,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T17:59:17+08:00",
+      "search_terms": [
+        "苫小牧",
+        "苫小牧市",
+        "苫小牧市 北海道"
+      ]
+    },
+    {
+      "place_id": "ChIJp4_N0pFhdV8RU5JtI8f0ro0",
+      "name_zh": "登别",
+      "google_title": "登別市",
+      "formatted_address": "日本、北海道登別市",
+      "lat": 42.4127914,
+      "lon": 141.1066064,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T17:59:20+08:00",
+      "search_terms": [
+        "登別市",
+        "登別市 北海道",
+        "登别"
+      ]
+    },
+    {
+      "place_id": "ChIJoTS-hZ1XdV8ReVBIwrZTH2c",
+      "name_zh": "洞爷湖",
+      "google_title": "洞爺湖町",
+      "formatted_address": "日本、北海道虻田郡洞爺湖町",
+      "lat": 42.54720409999999,
+      "lon": 140.7663242,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T17:59:22+08:00",
+      "search_terms": [
+        "洞爷湖",
+        "洞爺湖町",
+        "洞爺湖町 北海道"
+      ]
+    },
+    {
+      "place_id": "ChIJIU281S1cnl8RW8N4lip9fZE",
+      "name_zh": "函馆",
+      "google_title": "函館市",
+      "formatted_address": "日本、北海道函館市",
+      "lat": 41.7686961,
+      "lon": 140.7290599,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T17:59:25+08:00",
+      "search_terms": [
+        "函館市",
+        "函館市 北海道",
+        "函馆"
+      ]
+    },
+    {
+      "place_id": "ChIJwwqCmgznDF8RsgnBr9YtEn4",
+      "name_zh": "旭川",
+      "google_title": "旭川市",
+      "formatted_address": "日本、北海道旭川市",
+      "lat": 43.7708833,
+      "lon": 142.3650083,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T17:59:28+08:00",
+      "search_terms": [
+        "旭川",
+        "旭川市",
+        "旭川市 北海道"
+      ]
+    },
+    {
+      "place_id": "ChIJL_Q3O3jODF8Rbc5gAOO92fM",
+      "name_zh": "美瑛",
+      "google_title": "美瑛町",
+      "formatted_address": "日本、北海道上川郡美瑛町",
+      "lat": 43.58742609999999,
+      "lon": 142.4666158,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T17:59:30+08:00",
+      "search_terms": [
+        "美瑛",
+        "美瑛町",
+        "美瑛町 北海道"
+      ]
+    },
+    {
+      "place_id": "ChIJj1EPMdVPc18RKt8wkJs2fB8",
+      "name_zh": "富良野",
+      "google_title": "富良野市",
+      "formatted_address": "日本、北海道富良野市",
+      "lat": 43.3420458,
+      "lon": 142.3831624,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T17:59:33+08:00",
+      "search_terms": [
+        "富良野",
+        "富良野市",
+        "富良野市 北海道"
+      ]
+    },
+    {
+      "place_id": "ChIJ5-d2UcSHc18RyHbb6bToaxc",
+      "name_zh": "带广",
+      "google_title": "帯広市",
+      "formatted_address": "日本、北海道帯広市",
+      "lat": 42.9233354,
+      "lon": 143.197199,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T17:59:36+08:00",
+      "search_terms": [
+        "带广",
+        "帯広市",
+        "帯広市 北海道"
+      ]
+    },
+    {
+      "place_id": "ChIJNwyPUc8-c18RECYBdHtJF8o",
+      "name_zh": "新得 / 佐幌",
+      "google_title": "新得町",
+      "formatted_address": "日本、北海道上川郡新得町",
+      "lat": 43.0797832,
+      "lon": 142.8388718,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T17:59:39+08:00",
+      "search_terms": [
+        "新得 / 佐幌",
+        "新得町",
+        "新得町 北海道"
+      ]
+    },
+    {
+      "place_id": "ChIJ0-NaIlRdcl8ReqtC8oEIzgQ",
+      "name_zh": "钏路",
+      "google_title": "釧路市",
+      "formatted_address": "日本、北海道釧路市",
+      "lat": 42.9849413,
+      "lon": 144.3818041,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T17:59:41+08:00",
+      "search_terms": [
+        "釧路市",
+        "釧路市 北海道",
+        "钏路"
+      ]
+    },
+    {
+      "place_id": "ChIJC6LOPiOEcl8RiVVNMtGqcBI",
+      "name_zh": "阿寒湖",
+      "google_title": "阿寒湖",
+      "formatted_address": "日本、北海道釧路市 阿寒湖",
+      "lat": 43.45725849999999,
+      "lon": 144.1040147,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T17:59:44+08:00",
+      "search_terms": [
+        "阿寒湖",
+        "阿寒湖 北海道"
+      ]
+    },
+    {
+      "place_id": "ChIJ8Qolai96bV8RQJ81e0F8ogw",
+      "name_zh": "弟子屈 / 摩周",
+      "google_title": "弟子屈町",
+      "formatted_address": "日本、北海道川上郡弟子屈町",
+      "lat": 43.48534799999999,
+      "lon": 144.4592988,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T17:59:47+08:00",
+      "search_terms": [
+        "弟子屈 / 摩周",
+        "弟子屈町",
+        "弟子屈町 北海道"
+      ]
+    },
+    {
+      "place_id": "ChIJ8xP4PUE2bV8RnzJvgDoJv6U",
+      "name_zh": "网走",
+      "google_title": "網走市",
+      "formatted_address": "日本、北海道網走市",
+      "lat": 44.0206059,
+      "lon": 144.2734837,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T17:59:49+08:00",
+      "search_terms": [
+        "網走市",
+        "網走市 北海道",
+        "网走"
+      ]
+    },
+    {
+      "place_id": "ChIJOU_nKlvDbF8RHfNekp0elQA",
+      "name_zh": "斜里 / 知床",
+      "google_title": "斜里町",
+      "formatted_address": "日本、北海道斜里郡斜里町",
+      "lat": 43.9114765,
+      "lon": 144.6707651,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T17:59:52+08:00",
+      "search_terms": [
+        "斜里 / 知床",
+        "斜里町",
+        "斜里町 北海道"
+      ]
+    },
+    {
+      "place_id": "ChIJ_YwxQ5bAbF8RB1nSuDecgTU",
+      "name_zh": "罗臼",
+      "google_title": "羅臼町",
+      "formatted_address": "日本、北海道目梨郡羅臼町",
+      "lat": 44.0218788,
+      "lon": 145.1897129,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T17:59:55+08:00",
+      "search_terms": [
+        "罗臼",
+        "羅臼町",
+        "羅臼町 北海道"
+      ]
+    },
+    {
+      "place_id": "ChIJFX3QvhRFDV8R8fTVhB4yOgg",
+      "name_zh": "远轻",
+      "google_title": "遠軽町",
+      "formatted_address": "日本、北海道紋別郡遠軽町",
+      "lat": 44.062027,
+      "lon": 143.5279742,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T17:59:57+08:00",
+      "search_terms": [
+        "远轻",
+        "遠軽町",
+        "遠軽町 北海道"
+      ]
+    },
+    {
+      "place_id": "ChIJJyl2-6JVDV8RNT7L_Uif_sg",
+      "name_zh": "北见",
+      "google_title": "北見市",
+      "formatted_address": "日本、北海道北見市",
+      "lat": 43.8039761,
+      "lon": 143.8957837,
+      "place_type": "city_or_area",
+      "provider": "Google Maps",
+      "verified_at": "2026-08-10T18:00:00+08:00",
+      "search_terms": [
+        "北見市",
+        "北見市 北海道",
+        "北见"
+      ]
+    }
+  ]
+}

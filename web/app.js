@@ -1,8 +1,9 @@
-const STORAGE_KEY = "hokkaido-region-view-v1";
+const STORAGE_KEY = "hokkaido-trip-planner-v2";
 const state = {
-  candidates: [], regions: [], routes: null, filtered: [], visibleRegions: [],
-  selectedCategories: new Set(), view: "regions", assignmentOverrides: {},
-  itineraryRegions: new Set(), itineraryCandidates: new Set(), dialog: null,
+  candidates: [], catalog: [], areas: [], view: "areas", selectedAreaId: null,
+  expandedAreas: new Set(), showAreas: true, showCandidates: false,
+  candidateQuery: "", candidateCategory: "", candidateUnassignedOnly: false,
+  searchPreview: null, pickerAreaId: null, pickerSelection: new Set(), draggedAreaId: null,
 };
 const $ = id => document.getElementById(id);
 const CATEGORY_LABELS = {
@@ -12,357 +13,284 @@ const CATEGORY_LABELS = {
   special_transport: "特别交通", regional_challenger_module: "区域 Challenger 模块",
 };
 const COLORS = {
-  natural_outdoor: "#39785f", animal_marine: "#4d6697", event_festival: "#c29131",
-  food_market_drink: "#bf5d3c", dessert_cafe_bakery: "#c6758e", lodging_onsen: "#8b5c86",
-  architecture_museum_shop_workshop: "#697b82", special_transport: "#387b8c",
-  regional_challenger_module: "#896e4d",
+  natural_outdoor: "#3f8a67", animal_marine: "#4b70ad", event_festival: "#d39b32",
+  food_market_drink: "#cf6647", dessert_cafe_bakery: "#cf7893", lodging_onsen: "#8c65a0",
+  architecture_museum_shop_workshop: "#687d86", special_transport: "#33849b",
+  regional_challenger_module: "#8a7151",
 };
-const FILTER_IDS = ["search", "category", "region", "l1Status", "l1Batch", "tripWindowFit", "dynamicRecheck", "visualEvidence", "uncertainty"];
-const els = FILTER_IDS.reduce((result, id) => ({ ...result, [id]: $(id) }), {});
 const unknown = value => window.ResearchDataAdapter.unknown(value);
 
 function esc(value) {
-  return String(value ?? "").replace(/[&<>'"]/g, char => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;",
-  }[char]));
+  return String(value ?? "").replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[char]));
 }
 function shown(value, fallback = "未研究") {
   if (unknown(value)) return fallback;
   if (typeof value === "boolean") return value ? "是" : "否";
-  if (Array.isArray(value)) return value.map(item => typeof item === "object" ? JSON.stringify(item, null, 2) : item).join("；");
-  if (typeof value === "object") return JSON.stringify(value, null, 2);
+  if (Array.isArray(value)) return value.map(item => typeof item === "object" ? JSON.stringify(item) : item).join("；");
+  if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
 function labelCategory(value) { return CATEGORY_LABELS[value] || value || "unknown"; }
 function validCoordinates(item) {
   const { lat, lon, verification_status: status } = item.location || {};
-  return status === "verified" && typeof lat === "number" && typeof lon === "number" && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+  return status === "verified" && Number.isFinite(lat) && Number.isFinite(lon);
 }
-function fillSelect(select, values, label = value => value) {
-  [...new Set(values.filter(value => !unknown(value)))].sort((a, b) => String(a).localeCompare(String(b), "zh-Hans"))
-    .forEach(value => {
-      const option = document.createElement("option"); option.value = value; option.textContent = label(value); select.appendChild(option);
-    });
+function areaById(id) { return state.areas.find(area => area.id === id); }
+function candidateById(id) { return state.candidates.find(candidate => candidate.id === id); }
+function areaForCandidate(id) { return state.areas.find(area => area.candidateIds.includes(id)) || null; }
+function candidatesForArea(id) { const area = areaById(id); return area ? area.candidateIds.map(candidateById).filter(Boolean) : []; }
+function searchCandidateText(item) {
+  return [item.id, item.name, item.names?.ja, item.names?.en, item.region, item.municipality, item.experience?.experience_summary]
+    .filter(Boolean).join(" ").toLowerCase();
 }
-function displayList(items, emptyText = "未研究") {
-  if (!Array.isArray(items) || !items.length) return `<p class="unknown-value">${esc(emptyText)}</p>`;
-  return `<ul class="research-list">${items.map(item => `<li>${esc(shown(item))}</li>`).join("")}</ul>`;
-}
-function dl(rows) { return `<dl>${rows.map(([key, value]) => `<dt>${esc(key)}</dt><dd>${esc(shown(value))}</dd>`).join("")}</dl>`; }
-function infoSection(title, content) { return `<section class="detail-section"><h3>${esc(title)}</h3>${content}</section>`; }
-function linkList(links) {
-  if (!links.length) return '<p class="unknown-value">尚无已记录证据链接</p>';
-  return `<div class="source-list">${links.map(link => {
-    const url = link.url || link.source_page_url || link.asset_url;
-    const label = link.source_name || link.source_platform || url || "未命名来源";
-    return url ? `<a href="${esc(url)}" target="_blank" rel="noreferrer">${esc(label)}</a>` : `<span>${esc(label)}</span>`;
-  }).join("")}</div>`;
-}
-
 function loadUserState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-    state.assignmentOverrides = saved.assignmentOverrides && typeof saved.assignmentOverrides === "object" ? saved.assignmentOverrides : {};
-    state.itineraryRegions = new Set(Array.isArray(saved.itineraryRegions) ? saved.itineraryRegions : []);
-    state.itineraryCandidates = new Set(Array.isArray(saved.itineraryCandidates) ? saved.itineraryCandidates : []);
-  } catch (_) {
-    state.assignmentOverrides = {}; state.itineraryRegions = new Set(); state.itineraryCandidates = new Set();
-  }
+    state.areas = Array.isArray(saved.areas) ? saved.areas.filter(area => area && area.id && Number.isFinite(area.lat) && Number.isFinite(area.lon)).map(area => ({
+      id: area.id, placeId: area.placeId || area.id, name: area.name || "未命名地区", address: area.address || "",
+      lat: area.lat, lon: area.lon, startDate: area.startDate || "", endDate: area.endDate || "",
+      nights: area.nights || "", note: area.note || "", candidateIds: Array.isArray(area.candidateIds) ? [...new Set(area.candidateIds)] : [],
+    })) : [];
+    state.selectedAreaId = state.areas.some(area => area.id === saved.selectedAreaId) ? saved.selectedAreaId : null;
+  } catch (_) { state.areas = []; state.selectedAreaId = null; }
 }
 function saveUserState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({
-    assignmentOverrides: state.assignmentOverrides,
-    itineraryRegions: [...state.itineraryRegions],
-    itineraryCandidates: [...state.itineraryCandidates],
-  }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ areas: state.areas, selectedAreaId: state.selectedAreaId }));
 }
-function baseRegionByCandidate() {
-  const result = new Map();
-  state.regions.forEach(region => region.candidate_ids.forEach(candidateId => result.set(candidateId, region.region_id)));
-  return result;
+function fillCategorySelect(select) {
+  Object.entries(CATEGORY_LABELS).forEach(([value, label]) => {
+    const option = document.createElement("option"); option.value = value; option.textContent = label; select.appendChild(option);
+  });
 }
-function regionIdForCandidate(candidateId) {
-  if (Object.prototype.hasOwnProperty.call(state.assignmentOverrides, candidateId)) return state.assignmentOverrides[candidateId];
-  return baseRegionByCandidate().get(candidateId) || null;
-}
-function candidatesForRegion(regionId) { return state.candidates.filter(candidate => regionIdForCandidate(candidate.id) === regionId); }
-function regionById(regionId) { return state.regions.find(region => region.region_id === regionId); }
-function regionNameForCandidate(candidateId) { return regionById(regionIdForCandidate(candidateId))?.name_zh || "未归属"; }
 
-let map, markerLayer;
+let map, areaLayer, candidateLayer, routeLayer, previewLayer;
+const areaMarkers = new Map();
+const candidateMarkers = new Map();
 function initMap() {
-  if (!window.L) {
-    $("map").innerHTML = '<div class="empty-list">地图组件未载入。候选列表与筛选仍可使用；请检查网络后刷新。</div>';
-    return;
-  }
-  map = L.map("map", { zoomControl: true }).setView([43.45, 142.7], 6);
+  map = L.map("map", { zoomControl: true, attributionControl: true }).setView([43.35, 142.15], 6);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 18, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 18, attribution: "© OpenStreetMap",
   }).addTo(map);
-  markerLayer = L.layerGroup().addTo(map);
+  routeLayer = L.layerGroup().addTo(map); areaLayer = L.layerGroup().addTo(map);
+  candidateLayer = L.layerGroup().addTo(map); previewLayer = L.layerGroup().addTo(map);
 }
-
-function setupFilters() {
-  fillSelect(els.category, state.candidates.map(item => item.category), labelCategory);
-  fillSelect(els.region, state.regions.map(item => item.name_zh));
-  fillSelect(els.l1Status, state.candidates.map(item => item.status));
-  fillSelect(els.l1Batch, state.candidates.map(item => item.batchId));
-  fillSelect(els.tripWindowFit, state.candidates.map(item => item.experience.trip_window_fit));
-  $("typeChips").innerHTML = Object.keys(CATEGORY_LABELS).map(category =>
-    `<button class="chip" data-category="${esc(category)}">${esc(CATEGORY_LABELS[category])}</button>`).join("");
-  $("typeChips").addEventListener("click", event => {
-    const button = event.target.closest("[data-category]"); if (!button) return;
-    const category = button.dataset.category;
-    state.selectedCategories.has(category) ? state.selectedCategories.delete(category) : state.selectedCategories.add(category);
-    button.classList.toggle("active", state.selectedCategories.has(category)); applyFilters();
+function areaIcon(selected = false, muted = false) {
+  return L.divIcon({ className: `area-map-marker${selected ? " is-selected" : ""}${muted ? " is-muted" : ""}`, html: '<span aria-label="行程地区">⭐</span>', iconSize: selected ? [38,38] : [32,32], iconAnchor: selected ? [19,32] : [16,27] });
+}
+function renderLegend(items) {
+  const categories = [...new Set(items.map(item => item.category))];
+  $("mapLegend").innerHTML = categories.map(category => `<div class="legend-item"><span class="type-dot" style="background:${COLORS[category]}"></span>${esc(labelCategory(category))}</div>`).join("");
+  $("mapLegend").hidden = !categories.length;
+}
+function mapCandidates() {
+  if (!state.showCandidates) return [];
+  if (state.selectedAreaId) return candidatesForArea(state.selectedAreaId).filter(validCoordinates);
+  if (state.view === "candidates") return filteredCandidates().filter(validCoordinates);
+  return state.candidates.filter(validCoordinates);
+}
+function renderMap({ fit = false } = {}) {
+  areaLayer.clearLayers(); candidateLayer.clearLayers(); routeLayer.clearLayers(); previewLayer.clearLayers();
+  areaMarkers.clear(); candidateMarkers.clear();
+  const selected = areaById(state.selectedAreaId);
+  const points = [];
+  if (state.showAreas) {
+    state.areas.forEach(area => {
+      const isSelected = area.id === state.selectedAreaId;
+      const marker = L.marker([area.lat, area.lon], { icon: areaIcon(isSelected, Boolean(selected && !isSelected)), zIndexOffset: isSelected ? 1000 : 500 });
+      marker.bindTooltip(area.name, { direction: "top", offset: [0,-23] });
+      marker.on("click", () => selectArea(area.id)); marker.addTo(areaLayer); areaMarkers.set(area.id, marker);
+      if (!selected || isSelected) points.push([area.lat, area.lon]);
+    });
+    if (!selected && state.areas.length > 1) {
+      L.polyline(state.areas.map(area => [area.lat, area.lon]), { color: "#346c58", weight: 3, opacity: .55, dashArray: "7 8" }).addTo(routeLayer);
+    }
+  }
+  const visibleCandidates = mapCandidates();
+  visibleCandidates.forEach(item => {
+    const color = COLORS[item.category] || "#687d86";
+    const marker = L.circleMarker([item.location.lat, item.location.lon], { radius: 7, color: "#fff", weight: 2, fillColor: color, fillOpacity: .96, className: "candidate-map-marker" });
+    marker.bindTooltip(item.name, { direction: "top" }); marker.on("click", () => openCandidate(item.id));
+    marker.addTo(candidateLayer); candidateMarkers.set(item.id, marker); points.push([item.location.lat, item.location.lon]);
   });
-  Object.values(els).forEach(element => element.addEventListener(element.type === "search" ? "input" : "change", applyFilters));
-  $("resetFilters").addEventListener("click", () => {
-    Object.values(els).forEach(element => { element.type === "checkbox" ? element.checked = false : element.value = ""; });
-    state.selectedCategories.clear(); document.querySelectorAll(".chip.active").forEach(chip => chip.classList.remove("active")); applyFilters();
-  });
+  renderLegend(visibleCandidates);
+  if (fit) {
+    if (selected && visibleCandidates.length === 0) map.setView([selected.lat, selected.lon], 10, { animate: true });
+    else if (points.length === 1) map.setView(points[0], selected ? 11 : 8, { animate: true });
+    else if (points.length > 1) map.fitBounds(L.latLngBounds(points).pad(.18), { maxZoom: selected ? 12 : 9, animate: true });
+    else map.setView([43.35, 142.15], 6, { animate: true });
+  }
+  renderMapFocusCard();
+}
+function renderMapFocusCard() {
+  const area = areaById(state.selectedAreaId);
+  if (!area) { $("mapFocusCard").hidden = true; return; }
+  $("mapFocusCard").innerHTML = `<div class="preview-top"><div class="preview-symbol">⭐</div><div class="preview-copy"><p class="preview-meta">SELECTED AREA</p><h3>${esc(area.name)}</h3><p>${esc(area.address)}</p></div></div><div class="focus-row"><span>${area.candidateIds.length} Candidates · ${esc(area.startDate || "未定日期")}</span><button data-clear-area-focus>查看整个行程</button></div>`;
+  $("mapFocusCard").hidden = false;
 }
 
-function candidateMatchesNonSearch(item) {
-  if (els.category.value && item.category !== els.category.value) return false;
-  if (els.region.value && regionNameForCandidate(item.id) !== els.region.value) return false;
-  if (els.l1Status.value && item.status !== els.l1Status.value) return false;
-  if (els.l1Batch.value && item.batchId !== els.l1Batch.value) return false;
-  if (els.tripWindowFit.value && item.experience.trip_window_fit !== els.tripWindowFit.value) return false;
-  if (els.dynamicRecheck.checked && !item.dynamicRecheckRequired) return false;
-  if (els.visualEvidence.checked && !item.hasVisualEvidence) return false;
-  if (els.uncertainty.checked && !item.hasUncertainty) return false;
-  if (state.selectedCategories.size && !state.selectedCategories.has(item.category)) return false;
-  return true;
+function renderCounts() {
+  const assigned = new Set(state.areas.flatMap(area => area.candidateIds));
+  $("areaCount").textContent = state.areas.length; $("areaRailCount").textContent = state.areas.length;
+  $("assignedCount").textContent = assigned.size; $("candidateRailCount").textContent = filteredCandidates().length;
 }
-function candidateSearchMatches(item, query) {
-  if (!query) return true;
-  return [item.id, item.name, item.names.ja, item.names.en, item.region, item.municipality, item.category,
-    item.originalCategory, item.subcategory, item.experience.experience_summary].join(" ").toLowerCase().includes(query);
+function areaCandidateRows(area) {
+  const items = candidatesForArea(area.id);
+  if (!items.length) return '<div class="area-empty-candidates">这个地区还没有 Candidate</div>';
+  return items.map(item => `<div class="area-candidate-row"><span class="type-dot" style="background:${COLORS[item.category]}"></span><button data-open-candidate="${esc(item.id)}">${esc(item.name)}</button><button class="remove-mini" data-remove-candidate="${esc(item.id)}" data-area-id="${esc(area.id)}" aria-label="从地区移除">×</button></div>`).join("");
 }
-function applyFilters() {
-  const query = els.search.value.trim().toLowerCase();
-  state.filtered = state.candidates.filter(item => candidateMatchesNonSearch(item) && candidateSearchMatches(item, query));
-  state.visibleRegions = state.regions.map(region => {
-    const regionQueryMatch = query && [region.name_zh, region.region_id, ...(region.source_region_labels || [])].join(" ").toLowerCase().includes(query);
-    const candidates = candidatesForRegion(region.region_id).filter(item => candidateMatchesNonSearch(item) && (regionQueryMatch || candidateSearchMatches(item, query)));
-    return { ...region, candidates };
-  }).filter(region => region.candidates.length > 0);
-  renderList(); renderMarkers(); updateCounts(); renderLegend();
-}
-
-function candidateCard(item) {
-  return `<button class="candidate-card" data-candidate-id="${esc(item.id)}">
-    <span class="card-meta"><span>${esc(item.region || "unknown")}</span><span>·</span><span>${esc(labelCategory(item.category))}</span><span class="status">${esc(item.status || "L1 pending")}</span></span>
-    <h3>${esc(item.name)}</h3><p class="names">${esc(item.names.ja || "")} ${item.names.en ? `· ${esc(item.names.en)}` : ""}</p>
-    <p class="score-line"><span>FIT <strong>${esc(shown(item.experience.trip_window_fit, "unknown"))}</strong></span><span>BATCH <strong>${esc(item.batchId || "—")}</strong></span><span>TRIP <strong>${state.itineraryCandidates.has(item.id) ? "已加入" : "—"}</strong></span></p>
-  </button>`;
-}
-function regionCard(region) {
-  const selected = state.itineraryRegions.has(region.region_id);
-  const allCandidates = candidatesForRegion(region.region_id);
-  const allInTrip = allCandidates.length > 0 && allCandidates.every(item => state.itineraryCandidates.has(item.id));
-  const categories = [...new Set(region.candidates.map(item => labelCategory(item.category)))];
-  return `<article class="region-card" data-region-card="${esc(region.region_id)}">
-    <button class="region-card-main" data-open-region="${esc(region.region_id)}">
-      <span class="card-meta"><span>市 / 地区</span><span>·</span><span>${region.candidates.length} Candidates</span><span class="status">${selected ? "⭐ 行程中" : "未加入"}</span></span>
-      <h3>${esc(region.name_zh)}</h3>
-      <p class="region-categories">${categories.map(category => `<span>${esc(category)}</span>`).join("")}</p>
-    </button>
-    <div class="region-card-actions">
-      <button class="secondary-button" data-toggle-region="${esc(region.region_id)}">${selected ? "取消 ⭐" : "加入行程 ⭐"}</button>
-      <button class="text-button" data-batch-region="${esc(region.region_id)}">${allInTrip ? "移出全部 Candidates" : `批量加入 ${allCandidates.length} Candidates`}</button>
-    </div>
+function renderAreaCard(area) {
+  const selected = area.id === state.selectedAreaId; const expanded = state.expandedAreas.has(area.id);
+  const dateLabel = area.startDate ? `${area.startDate}${area.endDate ? ` — ${area.endDate}` : ""}` : "日期未定";
+  return `<article class="area-card${selected ? " selected" : ""}" data-area-card="${esc(area.id)}" draggable="true">
+    <div class="area-summary"><button class="drag-handle" aria-label="拖动调整顺序">⋮⋮</button><button class="area-main" data-select-area="${esc(area.id)}"><h3>${esc(area.name)}</h3><p>${esc(area.address)}</p></button><button class="area-star" data-select-area="${esc(area.id)}" aria-label="在地图查看">⭐</button></div>
+    <div class="area-quick-meta"><span>${esc(dateLabel)}</span>${area.nights ? `<span>${esc(area.nights)} 晚</span>` : ""}<span>${area.candidateIds.length} Candidates</span></div>
+    <div class="area-actions"><button class="candidate-toggle" data-toggle-area-candidates="${esc(area.id)}" aria-expanded="${expanded}"><span>查看 Candidates</span><span>${area.candidateIds.length}</span><span class="chevron">⌄</span></button><button class="icon-menu-button" data-toggle-area-editor="${esc(area.id)}" aria-label="编辑地区">•••</button></div>
+    ${expanded ? `<div class="area-expanded"><div class="area-candidates">${areaCandidateRows(area)}</div><button class="add-candidates-button" data-open-picker="${esc(area.id)}">＋ 添加 Candidates</button></div>` : ""}
+    ${selected && area.editing ? `<div class="area-editor"><label>地区名称<input data-area-field="name" data-area-id="${esc(area.id)}" value="${esc(area.name)}"></label><label>停留晚数<input type="number" min="0" data-area-field="nights" data-area-id="${esc(area.id)}" value="${esc(area.nights)}"></label><label>开始日期<input type="date" data-area-field="startDate" data-area-id="${esc(area.id)}" value="${esc(area.startDate)}"></label><label>结束日期<input type="date" data-area-field="endDate" data-area-id="${esc(area.id)}" value="${esc(area.endDate)}"></label><label class="wide">备注<textarea data-area-field="note" data-area-id="${esc(area.id)}">${esc(area.note)}</textarea></label><button class="delete-area" data-delete-area="${esc(area.id)}">移除这个地区</button></div>` : ""}
   </article>`;
 }
-function renderList() {
-  const railHeading = document.querySelector(".rail-heading h2");
-  if (state.view === "regions") {
-    railHeading.textContent = "市 / 地区";
-    $("railCount").textContent = `${state.visibleRegions.length} 地区 · ${state.visibleRegions.reduce((sum, region) => sum + region.candidates.length, 0)} Candidates`;
-    $("candidateList").innerHTML = state.visibleRegions.length ? state.visibleRegions.map(regionCard).join("") : '<div class="empty-list">没有符合当前筛选的市/地区。</div>';
-  } else {
-    railHeading.textContent = "全部 Candidates";
-    $("railCount").textContent = `${state.filtered.length} / ${state.candidates.length}`;
-    $("candidateList").innerHTML = state.filtered.length ? state.filtered.map(candidateCard).join("") : '<div class="empty-list">没有符合当前筛选的 Candidate。</div>';
-  }
+function renderAreas() {
+  $("areaList").innerHTML = state.areas.length ? state.areas.map(renderAreaCard).join("") : '<div class="empty-state"><div class="empty-icon">⭐</div><h3>行程还没有地区</h3><p>在地图上方搜索市或地区，确认后加入行程。</p></div>';
+}
+function filteredCandidates() {
+  const query = state.candidateQuery.trim().toLowerCase();
+  return state.candidates.filter(item => (!query || searchCandidateText(item).includes(query)) && (!state.candidateCategory || item.category === state.candidateCategory) && (!state.candidateUnassignedOnly || !areaForCandidate(item.id)));
+}
+function candidateCard(item) {
+  const area = areaForCandidate(item.id);
+  return `<button class="candidate-card" data-open-candidate="${esc(item.id)}"><span class="type-dot" style="background:${COLORS[item.category]}"></span><div><h3>${esc(item.name)}</h3><p>${esc(labelCategory(item.category))} · ${esc(item.id)}</p><span class="area-label${area ? "" : " unassigned-label"}">${area ? esc(area.name) : "未归属"}</span></div></button>`;
+}
+function renderCandidates() { const items = filteredCandidates(); $("candidateList").innerHTML = items.length ? items.map(candidateCard).join("") : '<div class="empty-state"><h3>没有符合筛选的 Candidate</h3></div>'; }
+function renderAll({ fitMap = false } = {}) { renderCounts(); renderAreas(); renderCandidates(); renderMap({ fit: fitMap }); updateLayerButtons(); }
+
+function selectArea(id) {
+  if (!areaById(id)) return; state.selectedAreaId = id; state.showAreas = true; state.showCandidates = true;
+  saveUserState(); renderAll({ fitMap: true });
+}
+function clearAreaFocus() { state.selectedAreaId = null; state.showCandidates = state.view === "candidates"; saveUserState(); renderAll({ fitMap: true }); }
+function deleteArea(id) { state.areas = state.areas.filter(area => area.id !== id); if (state.selectedAreaId === id) state.selectedAreaId = null; state.expandedAreas.delete(id); saveUserState(); renderAll({ fitMap: true }); }
+function removeCandidateFromArea(areaId, candidateId) { const area = areaById(areaId); if (!area) return; area.candidateIds = area.candidateIds.filter(id => id !== candidateId); saveUserState(); renderAll({ fitMap: true }); }
+function updateLayerButtons() { $("toggleAreaLayer").classList.toggle("active", state.showAreas); $("toggleCandidateLayer").classList.toggle("active", state.showCandidates); }
+
+function catalogMatches(query) {
+  const value = query.trim().toLowerCase(); if (!value) return [];
+  return state.catalog.filter(place => [place.name_zh, place.google_title, place.formatted_address, ...(place.search_terms || [])].join(" ").toLowerCase().includes(value)).slice(0, 8);
+}
+function renderAreaSearchResults() {
+  const query = $("areaSearch").value; $("clearAreaSearch").hidden = !query;
+  if (!query.trim()) { $("areaSearchResults").hidden = true; return; }
+  const results = catalogMatches(query);
+  $("areaSearchResults").innerHTML = results.length ? results.map(place => `<button class="search-result" data-preview-place="${esc(place.place_id)}"><span class="result-pin">⌖</span><span><strong>${esc(place.name_zh)}</strong><p>${esc(place.formatted_address)}</p></span><span class="provider-tag">Google Maps</span></button>`).join("") : '<div class="search-empty">当前已核对的 Google Maps 地区中没有匹配结果</div>';
+  $("areaSearchResults").hidden = false;
+}
+function previewPlace(placeId) {
+  const place = state.catalog.find(item => item.place_id === placeId); if (!place) return;
+  state.searchPreview = place; $("areaSearchResults").hidden = true; $("mapFocusCard").hidden = true;
+  const existing = state.areas.find(area => area.placeId === place.place_id);
+  $("placePreview").innerHTML = `<div class="preview-top"><div class="preview-symbol">⌖</div><div class="preview-copy"><p class="preview-meta">GOOGLE MAPS · CITY / AREA</p><h3>${esc(place.name_zh)}</h3><p>${esc(place.formatted_address)}</p></div></div><div class="preview-actions"><button class="primary-button" data-add-preview-place>${existing ? "查看已加入地区" : "加入行程 ⭐"}</button><button class="secondary-button" data-dismiss-preview>取消</button></div>`;
+  $("placePreview").hidden = false; previewLayer.clearLayers();
+  L.circleMarker([place.lat, place.lon], { radius: 10, color: "#fff", weight: 3, fillColor: "#1f6b53", fillOpacity: 1 }).addTo(previewLayer);
+  map.setView([place.lat, place.lon], 9, { animate: true });
+}
+function addPreviewPlace() {
+  const place = state.searchPreview; if (!place) return;
+  const existing = state.areas.find(area => area.placeId === place.place_id);
+  if (existing) { dismissPreview(); return selectArea(existing.id); }
+  const id = `area-${place.place_id}`;
+  state.areas.push({ id, placeId: place.place_id, name: place.name_zh, address: place.formatted_address, lat: place.lat, lon: place.lon, startDate: "", endDate: "", nights: "", note: "", candidateIds: [] });
+  state.expandedAreas.add(id); state.selectedAreaId = id; state.showAreas = true; state.showCandidates = true;
+  dismissPreview(); saveUserState(); renderAll({ fitMap: true });
+}
+function dismissPreview() { state.searchPreview = null; $("placePreview").hidden = true; previewLayer.clearLayers(); renderMapFocusCard(); }
+
+function openPicker(areaId) {
+  const area = areaById(areaId); if (!area) return;
+  state.pickerAreaId = areaId; state.pickerSelection = new Set(area.candidateIds);
+  $("pickerTitle").textContent = `添加到 ${area.name}`; $("pickerSearch").value = ""; $("pickerCategory").value = ""; $("pickerUnassignedOnly").checked = false;
+  renderPicker(); $("candidatePicker").classList.add("open"); $("candidatePicker").setAttribute("aria-hidden", "false"); $("drawerScrim").hidden = false;
+}
+function closePicker() { state.pickerAreaId = null; state.pickerSelection = new Set(); $("candidatePicker").classList.remove("open"); $("candidatePicker").setAttribute("aria-hidden", "true"); $("drawerScrim").hidden = true; }
+function pickerCandidates() {
+  const query = $("pickerSearch").value.trim().toLowerCase(); const category = $("pickerCategory").value; const onlyUnassigned = $("pickerUnassignedOnly").checked;
+  return state.candidates.filter(item => (!query || searchCandidateText(item).includes(query)) && (!category || item.category === category) && (!onlyUnassigned || !areaForCandidate(item.id) || areaForCandidate(item.id)?.id === state.pickerAreaId));
+}
+function renderPicker() {
+  const items = pickerCandidates();
+  $("pickerCandidateList").innerHTML = items.length ? items.map(item => { const current = areaForCandidate(item.id); return `<label class="picker-row"><input type="checkbox" value="${esc(item.id)}"${state.pickerSelection.has(item.id) ? " checked" : ""}><span class="type-dot" style="background:${COLORS[item.category]}"></span><span><h3>${esc(item.name)}</h3><p>${esc(labelCategory(item.category))}${current ? ` · 当前：${esc(current.name)}` : " · 未归属"}</p></span></label>`; }).join("") : '<div class="empty-state"><h3>没有符合筛选的 Candidate</h3></div>';
+  $("pickerSelectionCount").textContent = `已选择 ${state.pickerSelection.size}`;
+}
+function savePicker() {
+  const target = areaById(state.pickerAreaId); if (!target) return;
+  const moved = [...state.pickerSelection].map(id => ({ id, area: areaForCandidate(id) })).filter(row => row.area && row.area.id !== target.id);
+  if (moved.length && !window.confirm(`${moved.length} 个 Candidate 已属于其他地区。确认移动到“${target.name}”吗？`)) return;
+  state.areas.forEach(area => { if (area.id !== target.id) area.candidateIds = area.candidateIds.filter(id => !state.pickerSelection.has(id)); });
+  target.candidateIds = [...state.pickerSelection]; state.expandedAreas.add(target.id); saveUserState(); closePicker(); renderAll({ fitMap: true });
 }
 
-function regionIcon(region) {
-  const selected = state.itineraryRegions.has(region.region_id);
-  return L.divIcon({
-    className: `region-map-marker${selected ? " selected" : ""}`,
-    html: selected ? '<span aria-label="已加入行程">⭐</span>' : `<span>${candidatesForRegion(region.region_id).length}</span>`,
-    iconSize: selected ? [34, 34] : [30, 30], iconAnchor: selected ? [17, 17] : [15, 15],
-  });
-}
-function renderMarkers() {
-  if (!markerLayer) return;
-  markerLayer.clearLayers();
-  const points = [];
-  if (state.view === "regions") {
-    state.visibleRegions.forEach(region => {
-      const marker = L.marker([region.center_lat, region.center_lon], { icon: regionIcon(region), zIndexOffset: state.itineraryRegions.has(region.region_id) ? 1000 : 0 });
-      marker.bindTooltip(`${esc(region.name_zh)} · ${region.candidates.length} Candidates`); marker.on("click", () => openRegion(region.region_id)); marker.addTo(markerLayer);
-      points.push([region.center_lat, region.center_lon]);
-    });
-  } else {
-    state.filtered.filter(validCoordinates).forEach(item => {
-      const marker = L.circleMarker([item.location.lat, item.location.lon], { radius: 8, color: "#fff", weight: 2, fillColor: COLORS[item.category] || "#707774", fillOpacity: .95 });
-      marker.bindTooltip(esc(item.name)); marker.on("click", () => openCandidate(item.id)); marker.addTo(markerLayer); points.push([item.location.lat, item.location.lon]);
-    });
-  }
-  if (points.length) map.fitBounds(L.latLngBounds(points).pad(.15), { maxZoom: 10 });
-  const notice = $("mapNotice"); notice.hidden = points.length > 0;
-  if (!points.length) notice.textContent = state.view === "regions" ? "当前筛选没有市/地区。" : "当前筛选没有 Candidate。";
-}
-function updateCounts() {
-  const visibleCandidates = state.view === "regions" ? state.visibleRegions.reduce((sum, region) => sum + region.candidates.length, 0) : state.filtered.length;
-  $("visibleCount").textContent = visibleCandidates;
-  $("markerCount").textContent = state.view === "regions" ? state.visibleRegions.length : state.filtered.filter(validCoordinates).length;
-  $("itineraryCount").textContent = state.itineraryRegions.size;
-}
-
-function toggleRegionItinerary(regionId) {
-  state.itineraryRegions.has(regionId) ? state.itineraryRegions.delete(regionId) : state.itineraryRegions.add(regionId);
-  saveUserState(); applyFilters(); if (state.dialog?.type === "region" && state.dialog.id === regionId) openRegion(regionId, false);
-}
-function toggleRegionCandidates(regionId) {
-  const candidates = candidatesForRegion(regionId);
-  const allInTrip = candidates.length && candidates.every(item => state.itineraryCandidates.has(item.id));
-  candidates.forEach(item => allInTrip ? state.itineraryCandidates.delete(item.id) : state.itineraryCandidates.add(item.id));
-  saveUserState(); applyFilters(); if (state.dialog?.type === "region" && state.dialog.id === regionId) openRegion(regionId, false);
-}
-function toggleCandidateItinerary(candidateId) {
-  state.itineraryCandidates.has(candidateId) ? state.itineraryCandidates.delete(candidateId) : state.itineraryCandidates.add(candidateId);
-  saveUserState(); applyFilters(); if (state.dialog?.type === "candidate" && state.dialog.id === candidateId) openCandidate(candidateId, false);
-}
-function assignCandidates(candidateIds, regionId) {
-  candidateIds.forEach(candidateId => { state.assignmentOverrides[candidateId] = regionId || null; });
-  saveUserState(); applyFilters();
-}
-
-function renderCandidateRows(items, regionId) {
-  return `<div class="region-candidate-list">${items.map(item => `<div class="region-candidate-row">
-    <button class="candidate-row-main" data-open-candidate="${esc(item.id)}"><strong>${esc(item.name)}</strong><span>${esc(labelCategory(item.category))} · ${esc(item.status)}</span></button>
-    <span class="candidate-trip-state">${state.itineraryCandidates.has(item.id) ? "已加入行程" : ""}</span>
-    <button class="text-button" data-unassign-candidate="${esc(item.id)}" data-from-region="${esc(regionId)}">解除归属</button>
-  </div>`).join("")}</div>`;
-}
-function openRegion(regionId, show = true) {
-  const region = regionById(regionId); if (!region) return;
-  const candidates = candidatesForRegion(regionId);
-  const selected = state.itineraryRegions.has(regionId);
-  const allInTrip = candidates.length && candidates.every(item => state.itineraryCandidates.has(item.id));
-  const otherCandidates = state.candidates.filter(item => regionIdForCandidate(item.id) !== regionId);
-  $("detailContent").innerHTML = `
-    <header class="detail-hero"><p class="eyebrow">CITY / AREA · ${esc(region.region_id)}</p><h2>${esc(region.name_zh)}</h2><p class="alt-names">市/地区是独立前台实体，不是 Candidate</p></header>
-    <div class="detail-body">
-      <div class="detail-tags"><span class="detail-tag">市 / 地区</span><span class="detail-tag">${candidates.length} Candidates</span><span class="detail-tag">${selected ? "⭐ 行程中" : "未加入行程"}</span></div>
-      <div class="region-detail-actions">
-        <button class="primary-button" data-toggle-region="${esc(regionId)}">${selected ? "取消行程星标" : "加入行程并显示 ⭐"}</button>
-        <button class="secondary-button" data-batch-region="${esc(regionId)}">${allInTrip ? "把全部 Candidates 移出行程" : "把全部 Candidates 加入行程"}</button>
-      </div>
-      ${infoSection("下属 Candidates", renderCandidateRows(candidates, regionId))}
-      ${infoSection("批量调整 Candidate 归属", `<p class="assignment-help">可多选其他 Candidates；保存后它们会从原地区移动到“${esc(region.name_zh)}”。</p>
-        <select id="regionCandidateAssignment" class="assignment-select" multiple size="8" aria-label="选择要移入此地区的 Candidates">
-          ${otherCandidates.map(item => `<option value="${esc(item.id)}">${esc(item.name)} · 当前：${esc(regionNameForCandidate(item.id))}</option>`).join("")}
-        </select>
-        <button class="secondary-button assignment-save" data-assign-to-region="${esc(regionId)}">把所选 Candidates 批量移入此地区</button>`)}
-      ${infoSection("地区地图点", dl([["中心点", `${region.center_lat}, ${region.center_lon}`], ["计算方式", region.coordinate_method], ["原始地区标签", region.source_region_labels]]))}
-    </div>`;
-  state.dialog = { type: "region", id: regionId };
-  if (show) $("detailDialog").showModal();
-}
-
+function displayList(items, emptyText = "未研究") { return Array.isArray(items) && items.length ? `<ul class="research-list">${items.map(item => `<li>${esc(shown(item))}</li>`).join("")}</ul>` : `<p class="unknown-value">${esc(emptyText)}</p>`; }
+function dl(rows) { return `<dl>${rows.map(([key,value]) => `<dt>${esc(key)}</dt><dd>${esc(shown(value))}</dd>`).join("")}</dl>`; }
+function infoSection(title, content) { return `<section class="detail-section"><h3>${esc(title)}</h3>${content}</section>`; }
 function renderVisualEvidence(item) {
-  const visual = item.visual; const assets = visual.assets || [];
-  const content = assets.length ? `<div class="gallery">${assets.map(asset => {
-    const url = asset.asset_url || asset.source_page_url;
-    const media = asset.asset_url && asset.asset_type === "image" ? `<img src="${esc(asset.asset_url)}" alt="${esc(asset.caption || item.name)}" loading="lazy">` : '<div class="photo-placeholder"><span>VISUAL SOURCE</span><p>查看来源页</p></div>';
-    return `<figure>${url ? `<a href="${esc(url)}" target="_blank" rel="noreferrer">${media}</a>` : media}<figcaption>${esc(shown(asset.what_this_image_is_showing || asset.caption))}</figcaption></figure>`;
-  }).join("")}</div>` : '<div class="photo-placeholder"><span>VISUAL EVIDENCE</span><p>尚无已研究视觉证据</p></div>';
-  return `${content}${dl([["旅行窗口应看到", visual.what_should_be_visible_during_2026_09_05_18], ["不太可能看到", visual.what_is_unlikely_to_be_visible], ["季节错配说明", visual.season_mismatch_note], ["视角警告", visual.perspective_warning]])}`;
+  const assets = item.visual?.assets || [];
+  if (!assets.length) return '<div class="photo-placeholder"><p>尚无已研究视觉证据</p></div>';
+  return `<div class="gallery">${assets.map(asset => { const url = asset.asset_url || asset.source_page_url; return `<figure>${asset.asset_url ? `<img src="${esc(asset.asset_url)}" alt="${esc(asset.caption || item.name)}" loading="lazy">` : '<div class="photo-placeholder">VISUAL SOURCE</div>'}<figcaption>${esc(shown(asset.what_this_image_is_showing || asset.caption))}</figcaption></figure>`; }).join("")}</div>`;
 }
-function renderEvidence(item) {
-  const links = Object.values(item.sourcePacks).flat();
-  return `${linkList(links)}${dl([["Provenance", item.provenance.map(row => `${row.source_file} · ${row.source_section} · ${row.data_role}`)], ["Latest L1 overlay", item.latestOverlay ? `${item.latestOverlay.batch_id} · ${item.latestOverlay.researched_at}` : "L1 pending"], ["历史评估（不参与当前排名）", item.historicalAssessment]])}`;
-}
-function renderGaps(item) {
-  const rows = [...item.uncertainties.map(value => ({ type: "不确定项", value })), ...item.dynamicRechecks.map(value => ({ type: "动态复核", value })), ...item.level2Attention.map(value => ({ type: "L2 attention", value })), ...item.conflicts.map(value => ({ type: "保留冲突", value }))];
-  return rows.length ? `<ul class="research-list">${rows.map(row => `<li><strong>${esc(row.type)}</strong><br>${esc(shown(row.value))}</li>`).join("")}</ul>` : '<p class="unknown-value">尚未记录明确研究缺口；这不代表事实已经完备。</p>';
-}
-function openCandidate(id, show = true) {
-  const item = state.candidates.find(candidate => candidate.id === id); if (!item) return;
-  const temporal = item.temporal; const position = temporal.trip_window_position || {};
-  const currentRegionId = regionIdForCandidate(item.id) || "";
-  $("detailContent").innerHTML = `
-    <header class="detail-hero"><p class="eyebrow">${esc(item.id)}</p><h2>${esc(item.name)}</h2><p class="alt-names">${esc(item.names.ja || "")}<br>${esc(item.names.en || "")}</p></header>
-    <div class="detail-body">
-      <div class="detail-tags"><span class="detail-tag">${esc(labelCategory(item.category))}</span><span class="detail-tag">${esc(item.region || "unknown")}</span><span class="detail-tag">${esc(regionNameForCandidate(item.id))}</span><span class="detail-tag">${state.itineraryCandidates.has(item.id) ? "已加入行程" : "未加入行程"}</span></div>
-      ${infoSection("市 / 地区归属", `<div class="candidate-assignment-controls"><select id="candidateRegionSelect" aria-label="Candidate 市/地区归属"><option value="">未归属</option>${state.regions.map(region => `<option value="${esc(region.region_id)}"${region.region_id === currentRegionId ? " selected" : ""}>${esc(region.name_zh)}</option>`).join("")}</select><button class="secondary-button" data-save-candidate-region="${esc(item.id)}">保存归属</button><button class="text-button" data-toggle-candidate-trip="${esc(item.id)}">${state.itineraryCandidates.has(item.id) ? "移出行程" : "加入行程"}</button></div>`)}
-      ${infoSection("Identity", dl([["Candidate ID", item.id], ["Entity type", item.candidate.entity_type], ["Research subject role", item.role], ["Original category", item.originalCategory], ["Subcategory", item.subcategory], ["Municipality", item.municipality], ["Coordinate", item.location.verification_status], ["Coordinate scope", item.location.scope]]))}
-      ${infoSection("30 秒预览", dl([["Experience summary", item.experience.experience_summary], ["Why people love it", item.experience.why_people_love_it], ["Trip-window fit", item.experience.trip_window_fit]]))}
-      ${infoSection("实际会做什么", displayList(item.experience.what_you_actually_do, "尚未完成 L1 行为步骤研究"))}
-      ${infoSection("9/5–9/18 实际体验", dl([["Sep 2026 experience", item.experience.sep_2026_experience], ["Trip-window position", position.position], ["Preferred segment", position.preferred_trip_segment], ["Why these dates", position.why_these_dates_are_better]]))}
-      ${infoSection("Temporal Experience Profile", dl([["Ideal seasonal window", temporal.ideal_seasonal_window], ["Seasonal progression", temporal.seasonal_progression_summary], ["Preferred dates", position.preferred_dates_within_trip], ["Date sensitivity", position.date_sensitivity], ["Time constraint type", temporal.time_constraint_type], ["Hard date constraints", temporal.hard_date_constraints], ["Operating period", temporal.operating_period], ["Closure days", temporal.closure_days], ["Recommended time", temporal.recommended_visit_time || temporal.recommended_time_of_day], ["Early start", temporal.early_start_required]]))}
-      ${infoSection("Practical", dl([["Realistic duration", item.experience.realistic_duration], ["Weather dependency", item.experience.weather_dependency], ["Language dependency", item.experience.language_dependency], ["Physical load", item.experience.physical_load], ["Luggage friction", item.experience.luggage_friction], ["Address（历史原始记录）", item.original.address], ["Public transport（历史原始记录）", item.original.main_public_transport_access]]))}
-      ${infoSection("可能失望之处", `<p>${esc(shown(item.experience.common_disappointments))}</p>`)}
-      ${infoSection("Visual evidence", renderVisualEvidence(item))}
-      ${infoSection("Evidence & provenance", renderEvidence(item))}
-      ${infoSection("研究缺口", renderGaps(item))}
-    </div>`;
-  state.dialog = { type: "candidate", id: item.id };
-  if (show) $("detailDialog").showModal();
+function openCandidate(id) {
+  const item = candidateById(id); if (!item) return; const area = areaForCandidate(id); const position = item.temporal?.trip_window_position || {};
+  $("detailContent").innerHTML = `<header class="detail-hero"><p class="eyebrow">${esc(item.id)}</p><h2>${esc(item.name)}</h2><p class="alt-names">${esc(item.names?.ja || "")}<br>${esc(item.names?.en || "")}</p></header><div class="detail-body"><div class="detail-tags"><span class="detail-tag">${esc(labelCategory(item.category))}</span><span class="detail-tag">${area ? esc(area.name) : "未归属"}</span><span class="detail-tag">${esc(item.status)}</span></div>${infoSection("30 秒预览", dl([["Experience summary",item.experience?.experience_summary],["Why people love it",item.experience?.why_people_love_it],["Trip-window fit",item.experience?.trip_window_fit]]))}${infoSection("实际会做什么", displayList(item.experience?.what_you_actually_do,"尚未完成 L1 行为步骤研究"))}${infoSection("9/5–9/18 实际体验", dl([["Sep 2026 experience",item.experience?.sep_2026_experience],["Trip-window position",position.position],["Preferred segment",position.preferred_trip_segment]]))}${infoSection("Practical", dl([["Realistic duration",item.experience?.realistic_duration],["Weather dependency",item.experience?.weather_dependency],["Physical load",item.experience?.physical_load],["Municipality",item.municipality],["Coordinate scope",item.location?.scope]]))}${infoSection("可能失望之处", `<p>${esc(shown(item.experience?.common_disappointments))}</p>`)}${infoSection("Visual evidence",renderVisualEvidence(item))}${infoSection("研究缺口",displayList([...(item.uncertainties||[]),...(item.dynamicRechecks||[]),...(item.level2Attention||[])],"尚未记录明确研究缺口"))}</div>`;
+  $("detailDialog").showModal();
 }
 
+function switchView(view) {
+  state.view = view; document.querySelectorAll(".panel-tab").forEach(tab => tab.classList.toggle("active", tab.dataset.view === view));
+  $("areasView").classList.toggle("active", view === "areas"); $("candidatesView").classList.toggle("active", view === "candidates");
+  if (view === "candidates") { state.selectedAreaId = null; state.showCandidates = true; } else if (!state.selectedAreaId) state.showCandidates = false;
+  renderAll({ fitMap: true });
+}
 function setupInteractions() {
-  $("candidateList").addEventListener("click", event => {
-    const openRegionButton = event.target.closest("[data-open-region]"); if (openRegionButton) return openRegion(openRegionButton.dataset.openRegion);
-    const openCandidateButton = event.target.closest("[data-candidate-id]"); if (openCandidateButton) return openCandidate(openCandidateButton.dataset.candidateId);
-    const toggleRegionButton = event.target.closest("[data-toggle-region]"); if (toggleRegionButton) return toggleRegionItinerary(toggleRegionButton.dataset.toggleRegion);
-    const batchButton = event.target.closest("[data-batch-region]"); if (batchButton) return toggleRegionCandidates(batchButton.dataset.batchRegion);
+  document.querySelectorAll(".panel-tab").forEach(tab => tab.addEventListener("click", () => switchView(tab.dataset.view)));
+  $("areaSearch").addEventListener("input", renderAreaSearchResults);
+  $("clearAreaSearch").addEventListener("click", () => { $("areaSearch").value = ""; renderAreaSearchResults(); dismissPreview(); });
+  $("areaSearchResults").addEventListener("click", event => { const button = event.target.closest("[data-preview-place]"); if (button) previewPlace(button.dataset.previewPlace); });
+  $("placePreview").addEventListener("click", event => { if (event.target.closest("[data-add-preview-place]")) addPreviewPlace(); if (event.target.closest("[data-dismiss-preview]")) dismissPreview(); });
+  $("mapFocusCard").addEventListener("click", event => { if (event.target.closest("[data-clear-area-focus]")) clearAreaFocus(); });
+  $("toggleAreaLayer").addEventListener("click", () => { state.showAreas = !state.showAreas; renderMap(); updateLayerButtons(); });
+  $("toggleCandidateLayer").addEventListener("click", () => { state.showCandidates = !state.showCandidates; renderMap({ fit: state.showCandidates }); updateLayerButtons(); });
+  $("areaList").addEventListener("click", event => {
+    const select = event.target.closest("[data-select-area]"); if (select) return selectArea(select.dataset.selectArea);
+    const toggle = event.target.closest("[data-toggle-area-candidates]"); if (toggle) { const id = toggle.dataset.toggleAreaCandidates; state.expandedAreas.has(id) ? state.expandedAreas.delete(id) : state.expandedAreas.add(id); if (state.selectedAreaId !== id) state.selectedAreaId = id; state.showCandidates = true; saveUserState(); return renderAll({ fitMap: true }); }
+    const edit = event.target.closest("[data-toggle-area-editor]"); if (edit) { const area = areaById(edit.dataset.toggleAreaEditor); if (area) { area.editing = !area.editing; state.selectedAreaId = area.id; renderAreas(); } return; }
+    const picker = event.target.closest("[data-open-picker]"); if (picker) return openPicker(picker.dataset.openPicker);
+    const remove = event.target.closest("[data-remove-candidate]"); if (remove) return removeCandidateFromArea(remove.dataset.areaId, remove.dataset.removeCandidate);
+    const open = event.target.closest("[data-open-candidate]"); if (open) return openCandidate(open.dataset.openCandidate);
+    const del = event.target.closest("[data-delete-area]"); if (del) return deleteArea(del.dataset.deleteArea);
   });
-  $("detailContent").addEventListener("click", event => {
-    const openCandidateButton = event.target.closest("[data-open-candidate]"); if (openCandidateButton) return openCandidate(openCandidateButton.dataset.openCandidate, false);
-    const toggleRegionButton = event.target.closest("[data-toggle-region]"); if (toggleRegionButton) return toggleRegionItinerary(toggleRegionButton.dataset.toggleRegion);
-    const batchButton = event.target.closest("[data-batch-region]"); if (batchButton) return toggleRegionCandidates(batchButton.dataset.batchRegion);
-    const unassignButton = event.target.closest("[data-unassign-candidate]"); if (unassignButton) { const regionId = unassignButton.dataset.fromRegion; assignCandidates([unassignButton.dataset.unassignCandidate], null); return openRegion(regionId, false); }
-    const assignButton = event.target.closest("[data-assign-to-region]"); if (assignButton) { const select = $("regionCandidateAssignment"); const ids = [...select.selectedOptions].map(option => option.value); if (ids.length) assignCandidates(ids, assignButton.dataset.assignToRegion); return openRegion(assignButton.dataset.assignToRegion, false); }
-    const saveCandidateButton = event.target.closest("[data-save-candidate-region]"); if (saveCandidateButton) { assignCandidates([saveCandidateButton.dataset.saveCandidateRegion], $("candidateRegionSelect").value || null); return openCandidate(saveCandidateButton.dataset.saveCandidateRegion, false); }
-    const toggleCandidateButton = event.target.closest("[data-toggle-candidate-trip]"); if (toggleCandidateButton) return toggleCandidateItinerary(toggleCandidateButton.dataset.toggleCandidateTrip);
-  });
-}
-
-function setupViews() {
-  document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach(item => item.classList.remove("active")); tab.classList.add("active"); state.view = tab.dataset.view; applyFilters();
-  }));
-  const days = state.routes?.trip?.days || [];
-  $("routeTabs").innerHTML = days.map(day => `<button class="tab" data-view="day-${esc(day.day_number)}">Day ${esc(day.day_number)}</button>`).join("");
-}
-function renderLegend() {
-  if (state.view === "regions") {
-    $("legend").innerHTML = '<div class="legend-row"><span class="legend-star">⭐</span>已加入行程</div><div class="legend-row"><span class="legend-count">9</span>数字为下属 Candidate 数</div>';
-  } else {
-    $("legend").innerHTML = Object.keys(CATEGORY_LABELS).map(category => `<div class="legend-row"><span class="legend-dot" style="background:${COLORS[category]}"></span>${esc(CATEGORY_LABELS[category])}</div>`).join("");
-  }
+  $("areaList").addEventListener("input", event => { const field = event.target.dataset.areaField; const area = areaById(event.target.dataset.areaId); if (field && area) { area[field] = event.target.value; saveUserState(); if (field === "name") renderMapFocusCard(); renderCounts(); } });
+  $("areaList").addEventListener("dragstart", event => { const card = event.target.closest("[data-area-card]"); if (card) { state.draggedAreaId = card.dataset.areaCard; card.classList.add("dragging"); } });
+  $("areaList").addEventListener("dragend", event => { event.target.closest("[data-area-card]")?.classList.remove("dragging"); state.draggedAreaId = null; });
+  $("areaList").addEventListener("dragover", event => event.preventDefault());
+  $("areaList").addEventListener("drop", event => { event.preventDefault(); const target = event.target.closest("[data-area-card]")?.dataset.areaCard; if (!target || !state.draggedAreaId || target === state.draggedAreaId) return; const from = state.areas.findIndex(area => area.id === state.draggedAreaId); const to = state.areas.findIndex(area => area.id === target); const [moved] = state.areas.splice(from,1); state.areas.splice(to,0,moved); saveUserState(); renderAll({ fitMap: true }); });
+  $("candidateList").addEventListener("click", event => { const button = event.target.closest("[data-open-candidate]"); if (button) openCandidate(button.dataset.openCandidate); });
+  $("candidateSearch").addEventListener("input", event => { state.candidateQuery = event.target.value; renderCandidates(); renderCounts(); if (state.view === "candidates") renderMap(); });
+  $("candidateCategory").addEventListener("change", event => { state.candidateCategory = event.target.value; renderCandidates(); renderCounts(); if (state.view === "candidates") renderMap({fit:true}); });
+  $("candidateUnassignedOnly").addEventListener("change", event => { state.candidateUnassignedOnly = event.target.checked; renderCandidates(); renderCounts(); if (state.view === "candidates") renderMap({fit:true}); });
+  $("closePicker").addEventListener("click", closePicker); $("drawerScrim").addEventListener("click", closePicker);
+  ["pickerSearch","pickerCategory","pickerUnassignedOnly"].forEach(id => $(id).addEventListener(id === "pickerSearch" ? "input" : "change", renderPicker));
+  $("pickerCandidateList").addEventListener("change", event => { if (event.target.matches('input[type="checkbox"]')) { event.target.checked ? state.pickerSelection.add(event.target.value) : state.pickerSelection.delete(event.target.value); $("pickerSelectionCount").textContent = `已选择 ${state.pickerSelection.size}`; } });
+  $("selectAllPicker").addEventListener("click", () => { pickerCandidates().forEach(item => state.pickerSelection.add(item.id)); renderPicker(); });
+  $("savePicker").addEventListener("click", savePicker);
+  $("closeDetail").addEventListener("click", () => $("detailDialog").close());
 }
 
 async function boot() {
   try {
-    const paths = ["../data/hokkaido_places_master.json", "../data/candidate_locations.json", "../data/research_batches_level1.json", "../data/candidate_regions.json", "../data/routes.json"];
-    const responses = await Promise.all(paths.map(path => fetch(path)));
-    if (responses.some(response => !response.ok)) throw new Error("一个或多个数据文件无法读取");
-    const [master, locations, batches, regions, routes] = await Promise.all(responses.map(response => response.json()));
-    state.routes = routes; state.regions = regions.regions || [];
-    state.candidates = window.ResearchDataAdapter.buildCandidateViewModels(master, locations, batches);
-    loadUserState(); initMap(); setupFilters(); setupViews(); setupInteractions(); applyFilters();
+    const paths = ["../data/hokkaido_places_master.json","../data/candidate_locations.json","../data/research_batches_level1.json","../data/google_maps_area_catalog.json"];
+    const responses = await Promise.all(paths.map(path => fetch(path))); if (responses.some(response => !response.ok)) throw new Error("数据文件无法读取");
+    const [master,locations,batches,catalog] = await Promise.all(responses.map(response => response.json()));
+    state.candidates = window.ResearchDataAdapter.buildCandidateViewModels(master,locations,batches); state.catalog = catalog.places || [];
+    loadUserState(); fillCategorySelect($("candidateCategory")); fillCategorySelect($("pickerCategory")); initMap(); setupInteractions(); renderAll({ fitMap: true });
   } catch (error) {
-    $("candidateList").innerHTML = `<div class="empty-list"><strong>无法载入数据</strong><p>${esc(error.message)}</p><p>请从项目根目录启动本地服务器，不要直接双击 HTML。</p></div>`;
+    $("areaList").innerHTML = `<div class="empty-state"><h3>无法载入地图数据</h3><p>${esc(error.message)}</p></div>`;
   }
 }
-
-$("closeDetail").addEventListener("click", () => { $("detailDialog").close(); state.dialog = null; });
-$("detailDialog").addEventListener("click", event => { if (event.target === $("detailDialog")) { $("detailDialog").close(); state.dialog = null; } });
 boot();

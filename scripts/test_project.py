@@ -133,18 +133,24 @@ def main() -> int:
         failures.append("web app still references the legacy canonical filename")
     if "buildCandidateViewModels" not in adapter_text:
         failures.append("nested-schema adapter is missing")
-    if "candidate_regions.json" not in app_text or 'view: "regions"' not in app_text:
-        failures.append("existing region view is not the default Candidate grouping entry")
-    if "data-toggle-region" not in app_text or "region-map-marker" not in app_text:
-        failures.append("region itinerary star interaction is missing")
-    if "data-assign-to-region" not in app_text or "assignmentOverrides" not in app_text:
-        failures.append("manual and batch Candidate-to-region assignment is missing")
-    if "itinerary-builder" in index_text or "areaPreset" in index_text:
-        failures.append("a separate region feature was added instead of modifying the existing region view")
-    if 'data-view="regions"' not in index_text or 'data-view="all"' not in index_text:
-        failures.append("region and all-Candidate views are not both available")
-    if "filter(item => !regionIdForCandidate(item.id))" in app_text:
-        failures.append("all-Candidate view still hides Candidates assigned to a region")
+    if "google_maps_area_catalog.json" not in app_text or 'view: "areas"' not in app_text:
+        failures.append("empty user-created area planner is not the default entry")
+    if "candidate_regions.json" in app_text or "baseRegionByCandidate" in app_text:
+        failures.append("web app still loads preset areas or automatic Candidate assignments")
+    if "area-map-marker" not in index_text + app_text or "⭐" not in app_text:
+        failures.append("star-only itinerary area marker is missing")
+    if "data-toggle-area-candidates" not in app_text or "aria-expanded" not in app_text:
+        failures.append("quick Candidate expand/collapse control is missing from area cards")
+    if "data-open-picker" not in app_text or "pickerSelection" not in app_text or "areaForCandidate" not in app_text:
+        failures.append("manual searchable batch Candidate assignment is missing")
+    if 'data-view="areas"' not in index_text or 'data-view="candidates"' not in index_text:
+        failures.append("area and all-Candidate planner views are not both available")
+    if "COLORS[item.category]" not in app_text or "fitBounds" not in app_text or "map.setView" not in app_text:
+        failures.append("typed Candidate map colors or selected-area zoom behavior is missing")
+    if "在 Google Maps 打开" in index_text + app_text or "google_maps_url" in app_text:
+        failures.append("deferred Google Maps external-open feature was added")
+    if "export" in app_text.lower() or "import" in app_text.lower():
+        failures.append("deferred trip data import/export feature was added")
     if (ROOT / "data" / "places_master.json").exists():
         failures.append("legacy places_master.json remains as a competing current canonical")
     if not (ROOT / "data" / "history" / "places_master_legacy_42.json").exists():
