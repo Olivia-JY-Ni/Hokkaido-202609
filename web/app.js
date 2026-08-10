@@ -67,6 +67,16 @@ function fillCategorySelect(select) {
 let map, mapProvider = "leaflet", areaLayer, candidateLayer, routeLayer, previewLayer, searchTimer;
 const areaMarkers = new Map();
 const candidateMarkers = new Map();
+function initLeafletMap() {
+  mapProvider = "leaflet";
+  $("map").replaceChildren();
+  map = L.map("map", { zoomControl: true, attributionControl: true }).setView([43.35, 142.15], 6);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18, attribution: "© OpenStreetMap",
+  }).addTo(map);
+  routeLayer = L.layerGroup().addTo(map); areaLayer = L.layerGroup().addTo(map);
+  candidateLayer = L.layerGroup().addTo(map); previewLayer = L.layerGroup().addTo(map);
+}
 async function initMap() {
   const googleMaps = await (window.googleMapsReady || Promise.resolve(null));
   if (googleMaps) {
@@ -77,6 +87,12 @@ async function initMap() {
       mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
       clickableIcons: false, gestureHandling: "greedy",
     });
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    if ($("map").innerText.includes("无法正确加载 Google 地图")) {
+      state.placesReady = false;
+      initLeafletMap();
+      return;
+    }
     areaLayer = []; candidateLayer = []; routeLayer = []; previewLayer = [];
     try {
       await google.maps.importLibrary("places");
@@ -86,14 +102,7 @@ async function initMap() {
     }
     return;
   }
-
-  mapProvider = "leaflet";
-  map = L.map("map", { zoomControl: true, attributionControl: true }).setView([43.35, 142.15], 6);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 18, attribution: "© OpenStreetMap",
-  }).addTo(map);
-  routeLayer = L.layerGroup().addTo(map); areaLayer = L.layerGroup().addTo(map);
-  candidateLayer = L.layerGroup().addTo(map); previewLayer = L.layerGroup().addTo(map);
+  initLeafletMap();
 }
 function clearMapLayer(layer) {
   if (mapProvider === "google") {

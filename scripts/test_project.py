@@ -159,6 +159,8 @@ def main() -> int:
         failures.append("selected live area does not fetch the required identity and coordinate fields")
     if 'mapProvider = "google"' not in app_text or 'importLibrary("maps")' not in app_text:
         failures.append("Google Places results are not paired with a Google map")
+    if "initLeafletMap" not in app_text or "无法正确加载 Google 地图" not in app_text:
+        failures.append("the planner does not recover to its verified catalog map when Google billing is unavailable")
     if "google-maps-config.js" not in index_text or "google-maps-loader.js" not in index_text:
         failures.append("Google Maps runtime configuration is not loaded by the web app")
     if "GOOGLE_MAPS_API_KEY" not in pages_text or "secrets.GOOGLE_MAPS_API_KEY" not in pages_text:
