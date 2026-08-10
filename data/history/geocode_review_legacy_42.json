@@ -1,0 +1,601 @@
+{
+  "created_at": "2026-08-10T12:57:21+08:00",
+  "provider": "OpenStreetMap Nominatim",
+  "policy": "Pending human confirmation; no coordinate is written automatically.",
+  "items": [
+    {
+      "unique_id": "HKD-SAP-001",
+      "name_zh": "札幌秋季美食节",
+      "query": "北海道札幌市中央区 大通公園 西4丁目〜11丁目（会場群）",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-SAP-002",
+      "name_zh": "北海道艺术花火2026",
+      "query": "北海道札幌市東区モエレ沼公園1-1（モエレ沼公園）",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-SAP-003",
+      "name_zh": "莫埃来沼公园",
+      "query": "北海道札幌市東区モエレ沼公園1-1",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-SAP-004",
+      "name_zh": "六花亭札幌本店",
+      "query": "北海道札幌市中央区北4条西6丁目3-3",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-SAP-005",
+      "name_zh": "定山溪夏灯路",
+      "query": "北海道札幌市南区定山渓温泉東3丁目ほか（定山渓温泉街；定山渓神社会場を含む）",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-CTS-001",
+      "name_zh": "千岁鲑鱼故乡水族馆",
+      "query": "北海道千歳市花園2丁目312",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-TKA-001",
+      "name_zh": "十胜美食市集",
+      "query": "JR帯広駅 北側・南側会場周辺（北海道帯広市西2条南12丁目周辺）",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-TKA-002",
+      "name_zh": "带广挽曳马体验",
+      "query": "北海道帯広市西13条南9丁目1（帯広競馬場）",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-TKA-003",
+      "name_zh": "柳月 Sweetpia Garden",
+      "query": "北海道河東郡音更町下音更北9線西18-2（Sweetpia Garden）",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-TKA-004",
+      "name_zh": "六花亭带广本店",
+      "query": "北海道帯広市西2条南9丁目6",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-TKA-005",
+      "name_zh": "十胜川温泉三余庵",
+      "query": "北海道河東郡音更町十勝川温泉南13丁目1",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-DAI-001",
+      "name_zh": "旭岳缆车与姿见池",
+      "query": "北海道上川郡東川町旭岳温泉（大雪山旭岳ロープウェイ）",
+      "result_count": 1,
+      "ambiguous": false,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": [
+        {
+          "display_name": "大雪山旭岳ロープウェイ, 旭川旭岳温泉線, 東川町, 上川郡(石狩国), 上川総合振興局, 北海道, 北海道地方, 071-1472, 日本",
+          "latitude": 43.6574492,
+          "longitude": 142.8117785,
+          "type": "cable_car",
+          "importance": 4.973754482333131e-05,
+          "osm_type": "way",
+          "osm_id": 28242117,
+          "raw_result": {
+            "place_id": 271420639,
+            "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+            "osm_type": "way",
+            "osm_id": 28242117,
+            "lat": "43.6574492",
+            "lon": "142.8117785",
+            "category": "aerialway",
+            "type": "cable_car",
+            "place_rank": 30,
+            "importance": 4.973754482333131e-05,
+            "addresstype": "aerialway",
+            "name": "大雪山旭岳ロープウェイ",
+            "display_name": "大雪山旭岳ロープウェイ, 旭川旭岳温泉線, 東川町, 上川郡(石狩国), 上川総合振興局, 北海道, 北海道地方, 071-1472, 日本",
+            "address": {
+              "aerialway": "大雪山旭岳ロープウェイ",
+              "road": "旭川旭岳温泉線",
+              "town": "東川町",
+              "county": "上川郡(石狩国)",
+              "subprovince": "上川総合振興局",
+              "province": "北海道",
+              "ISO3166-2-lvl4": "JP-01",
+              "region": "北海道地方",
+              "postcode": "071-1472",
+              "country": "日本",
+              "country_code": "jp"
+            },
+            "boundingbox": [
+              "43.6530594",
+              "43.6619237",
+              "142.7988835",
+              "142.8246447"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "unique_id": "HKD-DAI-002",
+      "name_zh": "银泉台",
+      "query": "北海道上川郡上川町層雲峡 大雪山国立公園 銀泉台",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-ASH-001",
+      "name_zh": "旭山动物园",
+      "query": "北海道旭川市東旭川町倉沼",
+      "result_count": 2,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": [
+        {
+          "display_name": "東旭川町倉沼, 旭川市, 上川総合振興局, 北海道, 北海道地方, 071-1411, 日本",
+          "latitude": 43.759669,
+          "longitude": 142.486761,
+          "type": "quarter",
+          "importance": 0.1333833348592355,
+          "osm_type": "node",
+          "osm_id": 8755649127,
+          "raw_result": {
+            "place_id": 271407902,
+            "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+            "osm_type": "node",
+            "osm_id": 8755649127,
+            "lat": "43.7596690",
+            "lon": "142.4867610",
+            "category": "place",
+            "type": "quarter",
+            "place_rank": 20,
+            "importance": 0.1333833348592355,
+            "addresstype": "quarter",
+            "name": "東旭川町倉沼",
+            "display_name": "東旭川町倉沼, 旭川市, 上川総合振興局, 北海道, 北海道地方, 071-1411, 日本",
+            "address": {
+              "quarter": "東旭川町倉沼",
+              "city": "旭川市",
+              "subprovince": "上川総合振興局",
+              "province": "北海道",
+              "ISO3166-2-lvl4": "JP-01",
+              "region": "北海道地方",
+              "postcode": "071-1411",
+              "country": "日本",
+              "country_code": "jp"
+            },
+            "boundingbox": [
+              "43.7496690",
+              "43.7696690",
+              "142.4767610",
+              "142.4967610"
+            ]
+          }
+        },
+        {
+          "display_name": "東旭川町倉沼, 瑞穂旭川停車場線, 工業団地一条三丁目, 東旭川町日ノ出, 旭川市, 上川総合振興局, 北海道, 北海道地方, 078-8273, 日本",
+          "latitude": 43.7691371,
+          "longitude": 142.4710245,
+          "type": "traffic_signals",
+          "importance": 5.000152590214416e-05,
+          "osm_type": "node",
+          "osm_id": 190382574,
+          "raw_result": {
+            "place_id": 267962878,
+            "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+            "osm_type": "node",
+            "osm_id": 190382574,
+            "lat": "43.7691371",
+            "lon": "142.4710245",
+            "category": "highway",
+            "type": "traffic_signals",
+            "place_rank": 30,
+            "importance": 5.000152590214416e-05,
+            "addresstype": "highway",
+            "name": "東旭川町倉沼",
+            "display_name": "東旭川町倉沼, 瑞穂旭川停車場線, 工業団地一条三丁目, 東旭川町日ノ出, 旭川市, 上川総合振興局, 北海道, 北海道地方, 078-8273, 日本",
+            "address": {
+              "highway": "東旭川町倉沼",
+              "road": "瑞穂旭川停車場線",
+              "neighbourhood": "工業団地一条三丁目",
+              "quarter": "東旭川町日ノ出",
+              "city": "旭川市",
+              "subprovince": "上川総合振興局",
+              "province": "北海道",
+              "ISO3166-2-lvl4": "JP-01",
+              "region": "北海道地方",
+              "postcode": "078-8273",
+              "country": "日本",
+              "country_code": "jp"
+            },
+            "boundingbox": [
+              "43.7690871",
+              "43.7691871",
+              "142.4709745",
+              "142.4710745"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "unique_id": "HKD-ASH-002",
+      "name_zh": "旭川 Eat Marche",
+      "query": "JR旭川駅〜平和通買物公園・中心市街地",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-FUR-001",
+      "name_zh": "四季彩之丘",
+      "query": "北海道上川郡美瑛町新星第三",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-FUR-002",
+      "name_zh": "富田哈密瓜屋",
+      "query": "北海道空知郡中富良野町宮町3-32周辺（とみたメロンハウス）",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-SHR-001",
+      "name_zh": "知床五湖",
+      "query": "北海道斜里郡斜里町岩尾別 知床五湖",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-SHR-002",
+      "name_zh": "Kamuiwakka 温泉溪流",
+      "query": "北海道斜里郡斜里町遠音別村 カムイワッカ湯の滝",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-SHR-003",
+      "name_zh": "鲁沙湾棕熊观赏船",
+      "query": "北海道斜里郡斜里町ウトロ東・宇登呂港発",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-RUS-001",
+      "name_zh": "罗臼抹香鲸观鲸",
+      "query": "北海道目梨郡羅臼町 羅臼港周辺",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-SHR-004",
+      "name_zh": "北こぶし知床 Hotel & Resort",
+      "query": "北海道斜里郡斜里町ウトロ東172",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-SHR-005",
+      "name_zh": "钏路—知床观光巴士",
+      "query": "路线型项目：釧路駅前〜知床・宇登呂",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-KUS-001",
+      "name_zh": "钏路湿原 Norokko 观景列车",
+      "query": "JR釧路駅発（北海道釧路市北大通14丁目1）",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-KUS-002",
+      "name_zh": "钏路湿原独木舟",
+      "query": "集合点依运营商与线路而异；本轮主要参考釧路川细冈一带线路",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-KUS-003",
+      "name_zh": "钏路市丹顶鹤自然公园",
+      "query": "北海道釧路市鶴丘112",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-KUS-004",
+      "name_zh": "钏路秋季海鲜",
+      "query": "多地点：釧路駅〜幣舞橋中心城区餐饮/市场范围",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-AKA-001",
+      "name_zh": "KAMUY LUMINA 阿寒湖森林夜行",
+      "query": "北海道釧路市阿寒町阿寒湖温泉 ボッケ遊歩道コース内",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-AKA-002",
+      "name_zh": "阿寒游久之里鹤雅",
+      "query": "北海道釧路市阿寒町阿寒湖温泉4丁目6-10",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-AKA-003",
+      "name_zh": "Pirika 三湖观光巴士",
+      "query": "路线型项目：釧路駅前発〜摩周湖・屈斜路湖・阿寒湖",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-TOY-001",
+      "name_zh": "洞爷湖 Long Run Fireworks",
+      "query": "北海道虻田郡洞爺湖町洞爺湖温泉湖畔",
+      "result_count": 1,
+      "ambiguous": false,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": [
+        {
+          "display_name": "湖畔通り, 洞爺湖温泉, 洞爺湖町, 虻田郡, 胆振総合振興局, 北海道, 北海道地方, 049-5721, 日本",
+          "latitude": 42.5662902,
+          "longitude": 140.8218475,
+          "type": "pedestrian",
+          "importance": 0.05338607232776375,
+          "osm_type": "way",
+          "osm_id": 109968426,
+          "raw_result": {
+            "place_id": 269395391,
+            "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+            "osm_type": "way",
+            "osm_id": 109968426,
+            "lat": "42.5662902",
+            "lon": "140.8218475",
+            "category": "highway",
+            "type": "pedestrian",
+            "place_rank": 26,
+            "importance": 0.05338607232776375,
+            "addresstype": "road",
+            "name": "湖畔通り",
+            "display_name": "湖畔通り, 洞爺湖温泉, 洞爺湖町, 虻田郡, 胆振総合振興局, 北海道, 北海道地方, 049-5721, 日本",
+            "address": {
+              "road": "湖畔通り",
+              "neighbourhood": "洞爺湖温泉",
+              "town": "洞爺湖町",
+              "county": "虻田郡",
+              "subprovince": "胆振総合振興局",
+              "province": "北海道",
+              "ISO3166-2-lvl4": "JP-01",
+              "region": "北海道地方",
+              "postcode": "049-5721",
+              "country": "日本",
+              "country_code": "jp"
+            },
+            "boundingbox": [
+              "42.5658764",
+              "42.5664934",
+              "140.8167759",
+              "140.8268617"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "unique_id": "HKD-TOY-002",
+      "name_zh": "洞爷湖烟花观赏船",
+      "query": "洞爺湖汽船 本社前・花火鑑賞船桟橋（北海道虻田郡洞爺湖町洞爺湖温泉）",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-TOY-003",
+      "name_zh": "洞爷湖乃之风 Resort",
+      "query": "北海道虻田郡洞爺湖町洞爺湖温泉29-1",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-NOB-001",
+      "name_zh": "登别地狱谷",
+      "query": "北海道登別市登別温泉町 地獄谷",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-NOB-002",
+      "name_zh": "登别泷乃家",
+      "query": "北海道登別市登別温泉町162（滝乃家）",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-NOB-003",
+      "name_zh": "第一泷本馆",
+      "query": "北海道登別市登別温泉町55",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-OTA-001",
+      "name_zh": "小樽 TENGUU FES 2026",
+      "query": "北海道小樽市最上2丁目16-15 小樽天狗山周辺",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-OTA-002",
+      "name_zh": "小樽运河与历史街区",
+      "query": "北海道小樽市港町〜色内・堺町周辺",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-ABA-001",
+      "name_zh": "能取湖珊瑚草群落",
+      "query": "〒093-0135 北海道網走市卯原内60-3",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-ABA-002",
+      "name_zh": "网走·能取湖珊瑚草祭",
+      "query": "〒093-0135 北海道網走市卯原内60-3 能取湖サンゴ草群落地",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-ENG-001",
+      "name_zh": "远轻太阳之丘波斯菊节2026",
+      "query": "北海道紋別郡遠軽町丸大70-1 太陽の丘えんがる公園 虹のひろば",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    },
+    {
+      "unique_id": "HKD-SAH-001",
+      "name_zh": "佐幌 Bear Mountain",
+      "query": "北海道上川郡新得町狩勝高原 サホロリゾート周辺",
+      "result_count": 0,
+      "ambiguous": true,
+      "status": "pending_human_confirmation",
+      "error": null,
+      "results": []
+    }
+  ]
+}

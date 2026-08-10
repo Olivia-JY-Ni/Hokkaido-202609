@@ -1,0 +1,315 @@
+{
+  "schema_version": "1.1.0",
+  "generated_at": "2026-08-10",
+  "research_level": "level_1",
+  "batch_size_guideline": "approximately 8–12; smaller batches retained when category integrity is more useful than forced mixing",
+  "master_inventory_total": 77,
+  "level_1_eligible_total": 73,
+  "excluded_inventory_entities": [
+    {
+      "candidate_id": "RM-SAP",
+      "research_subject_role": "aggregate_context_module",
+      "reason": "aggregate context module; retained in master but not an independent Level 1 preview subject"
+    },
+    {
+      "candidate_id": "RM-ASH",
+      "research_subject_role": "aggregate_context_module",
+      "reason": "aggregate context module; retained in master but not an independent Level 1 preview subject"
+    },
+    {
+      "candidate_id": "RM-SHR",
+      "research_subject_role": "aggregate_context_module",
+      "reason": "aggregate context module; retained in master but not an independent Level 1 preview subject"
+    },
+    {
+      "candidate_id": "RM-KUS",
+      "research_subject_role": "aggregate_context_module",
+      "reason": "aggregate context module; retained in master but not an independent Level 1 preview subject"
+    }
+  ],
+  "batch_count": 10,
+  "qa": {
+    "eligible_candidate_ids_unique": true,
+    "no_duplicate_assignment": true,
+    "category_pure": true,
+    "coverage_exactly_once": true
+  },
+  "batches": [
+    {
+      "batch_id": "L1-01",
+      "research_level": "level_1",
+      "candidate_ids": [
+        "HKD-DAI-001",
+        "HKD-DAI-002",
+        "HKD-NOB-001",
+        "HKD-SHR-001",
+        "HKD-SHR-002",
+        "HKD-ABA-001",
+        "HKD-FUR-001",
+        "HKD-KUS-002"
+      ],
+      "candidate_names": [
+        "旭岳缆车与姿见池",
+        "银泉台",
+        "登别地狱谷",
+        "知床五湖",
+        "Kamuiwakka 温泉溪流",
+        "能取湖珊瑚草群落",
+        "四季彩之丘",
+        "钏路湿原独木舟"
+      ],
+      "normalized_categories": [
+        "natural_outdoor"
+      ],
+      "reason_for_grouping": "同一 normalized category：natural_outdoor；不为凑批次混入其他类别，批内再按地域邻近排序。",
+      "suggested_output_filename": "level1_01_natural_outdoor.json"
+    },
+    {
+      "batch_id": "L1-02",
+      "research_level": "level_1",
+      "candidate_ids": [
+        "HKD-SAH-001",
+        "HKD-CTS-001",
+        "HKD-TKA-002",
+        "HKD-ASH-001",
+        "HKD-SHR-003",
+        "HKD-RUS-001",
+        "HKD-KUS-003"
+      ],
+      "candidate_names": [
+        "佐幌 Bear Mountain",
+        "千岁鲑鱼故乡水族馆",
+        "带广挽曳马体验",
+        "旭山动物园",
+        "鲁沙湾棕熊观赏船",
+        "罗臼抹香鲸观鲸",
+        "钏路市丹顶鹤自然公园"
+      ],
+      "normalized_categories": [
+        "animal_marine"
+      ],
+      "reason_for_grouping": "同一 normalized category：animal_marine；不为凑批次混入其他类别，批内再按地域邻近排序。",
+      "suggested_output_filename": "level1_02_animal_marine.json"
+    },
+    {
+      "batch_id": "L1-03",
+      "research_level": "level_1",
+      "candidate_ids": [
+        "HKD-OTA-001",
+        "HKD-TKA-001",
+        "HKD-ASH-002",
+        "HKD-SAP-001",
+        "HKD-SAP-002",
+        "HKD-SAP-005",
+        "HKD-TOY-001",
+        "HKD-ABA-002",
+        "HKD-ENG-001",
+        "HKD-AKA-001"
+      ],
+      "candidate_names": [
+        "小樽 TENGUU FES 2026",
+        "十胜美食市集",
+        "旭川 Eat Marche",
+        "札幌秋季美食节",
+        "北海道艺术花火2026",
+        "定山溪夏灯路",
+        "洞爷湖 Long Run Fireworks",
+        "网走·能取湖珊瑚草祭",
+        "远轻太阳之丘波斯菊节2026",
+        "KAMUY LUMINA 阿寒湖森林夜行"
+      ],
+      "normalized_categories": [
+        "event_festival"
+      ],
+      "reason_for_grouping": "同一 normalized category：event_festival；不为凑批次混入其他类别，批内再按地域邻近排序。",
+      "suggested_output_filename": "level1_03_event_festival.json"
+    },
+    {
+      "batch_id": "L1-04",
+      "research_level": "level_1",
+      "candidate_ids": [
+        "R2-ASH-003",
+        "R2-ASH-004",
+        "R2-SAP-002",
+        "R2-SHR-001",
+        "R2-SHR-002",
+        "R2-SHR-003",
+        "HKD-KUS-004",
+        "R2-KUS-002",
+        "R2-KUS-003",
+        "R2-KUS-004",
+        "R2-KUS-005"
+      ],
+      "candidate_names": [
+        "蜂屋 本店",
+        "自由軒",
+        "回転寿司 根室花まる JRタワーステラプレイス店",
+        "BON'S HOME",
+        "波飛沫",
+        "知床食堂",
+        "钏路秋季海鲜",
+        "釧路和商市場",
+        "レストラン泉屋 総本店",
+        "炉ばた煉瓦",
+        "炉ばた"
+      ],
+      "normalized_categories": [
+        "food_market_drink"
+      ],
+      "reason_for_grouping": "同一 normalized category：food_market_drink；不为凑批次混入其他类别，批内再按地域邻近排序。",
+      "suggested_output_filename": "level1_04_food_market_drink.json"
+    },
+    {
+      "batch_id": "L1-05",
+      "research_level": "level_1",
+      "candidate_ids": [
+        "HKD-FUR-002",
+        "HKD-TKA-003",
+        "HKD-TKA-004",
+        "HKD-SAP-004",
+        "R2-SAP-003"
+      ],
+      "candidate_names": [
+        "富田哈密瓜屋",
+        "柳月 Sweetpia Garden",
+        "六花亭带广本店",
+        "六花亭札幌本店",
+        "パフェ、珈琲、酒、佐々木"
+      ],
+      "normalized_categories": [
+        "dessert_cafe_bakery"
+      ],
+      "reason_for_grouping": "同一 normalized category：dessert_cafe_bakery；不为凑批次混入其他类别，批内再按地域邻近排序。",
+      "suggested_output_filename": "level1_05_dessert_cafe_bakery.json"
+    },
+    {
+      "batch_id": "L1-06",
+      "research_level": "level_1",
+      "candidate_ids": [
+        "HKD-TKA-005",
+        "HKD-SHR-004",
+        "HKD-TOY-003",
+        "HKD-NOB-002",
+        "HKD-NOB-003",
+        "HKD-AKA-002"
+      ],
+      "candidate_names": [
+        "十胜川温泉三余庵",
+        "北こぶし知床 Hotel & Resort",
+        "洞爷湖乃之风 Resort",
+        "登别泷乃家",
+        "第一泷本馆",
+        "阿寒游久之里鹤雅"
+      ],
+      "normalized_categories": [
+        "lodging_onsen"
+      ],
+      "reason_for_grouping": "同一 normalized category：lodging_onsen；不为凑批次混入其他类别，批内再按地域邻近排序。",
+      "suggested_output_filename": "level1_06_lodging_onsen.json"
+    },
+    {
+      "batch_id": "L1-07",
+      "research_level": "level_1",
+      "candidate_ids": [
+        "R2-TKA-001",
+        "HKD-OTA-002",
+        "R2-ASH-001",
+        "R2-ASH-002",
+        "HKD-SAP-003",
+        "R2-SAP-001",
+        "R2-ABA-001",
+        "R2-ABA-002",
+        "R2-KUS-001"
+      ],
+      "candidate_names": [
+        "帯広百年記念館「十勝・帯広くらしと 食べものの時空間」特展",
+        "小樽运河与历史街区",
+        "旭川デザインセンター",
+        "旭川市博物館",
+        "莫埃来沼公园",
+        "北海道大学総合博物館／企画展「北大の恐竜たち」",
+        "北海道立北方民族博物館",
+        "オホーツク流氷館",
+        "釧路市立博物館"
+      ],
+      "normalized_categories": [
+        "architecture_museum_shop_workshop"
+      ],
+      "reason_for_grouping": "同一 normalized category：architecture_museum_shop_workshop；不为凑批次混入其他类别，批内再按地域邻近排序。",
+      "suggested_output_filename": "level1_07_architecture_museum_shop_workshop.json"
+    },
+    {
+      "batch_id": "L1-08",
+      "research_level": "level_1",
+      "candidate_ids": [
+        "HKD-TOY-002",
+        "R2-FUR-001",
+        "HKD-SHR-005",
+        "HKD-KUS-001",
+        "HKD-AKA-003"
+      ],
+      "candidate_names": [
+        "洞爷湖烟花观赏船",
+        "富良野・美瑛ノロッコ号（2026 最终季）",
+        "钏路—知床观光巴士",
+        "钏路湿原 Norokko 观景列车",
+        "Pirika 三湖观光巴士"
+      ],
+      "normalized_categories": [
+        "special_transport"
+      ],
+      "reason_for_grouping": "同一 normalized category：special_transport；不为凑批次混入其他类别，批内再按地域邻近排序。",
+      "suggested_output_filename": "level1_08_special_transport.json"
+    },
+    {
+      "batch_id": "L1-09",
+      "research_level": "level_1",
+      "candidate_ids": [
+        "JP-CH-002",
+        "JP-CH-004",
+        "JP-CH-003",
+        "JP-NM-002",
+        "JP-CH-001",
+        "JP-NM-001"
+      ],
+      "candidate_names": [
+        "岩手・花卷—盛冈 2–5日 Challenger 模块",
+        "御藏岛 2–5日 Challenger 模块",
+        "新潟・片贝 2–5日 Challenger 模块",
+        "石垣岛 Near-miss 模块",
+        "秋田・角馆 2–5日 Challenger 模块",
+        "立山黑部・室堂 + 富山 Near-miss 模块"
+      ],
+      "normalized_categories": [
+        "regional_challenger_module"
+      ],
+      "reason_for_grouping": "同一 normalized category：regional_challenger_module；不为凑批次混入其他类别，批内再按地域邻近排序。",
+      "suggested_output_filename": "level1_09_regional_challenger_module.json"
+    },
+    {
+      "batch_id": "L1-10",
+      "research_level": "level_1",
+      "candidate_ids": [
+        "JP-NM-004",
+        "JP-NM-007",
+        "JP-NM-008",
+        "JP-NM-003",
+        "JP-NM-006",
+        "JP-NM-005"
+      ],
+      "candidate_names": [
+        "东京・两国 Near-miss 模块",
+        "大阪・岸和田 Near-miss 模块",
+        "富山八尾 Near-miss 模块",
+        "福冈・筥崎宫 Near-miss 模块",
+        "镰仓・鹤冈八幡宫 Near-miss 模块",
+        "长野・小布施 Near-miss 模块"
+      ],
+      "normalized_categories": [
+        "regional_challenger_module"
+      ],
+      "reason_for_grouping": "同一 normalized category：regional_challenger_module；不为凑批次混入其他类别，批内再按地域邻近排序。",
+      "suggested_output_filename": "level1_10_regional_challenger_module.json"
+    }
+  ]
+}

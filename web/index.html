@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>北海道 · Candidate Experience 研究地图</title>
+  <meta name="description" content="Hokkaido 2026 September Trip 的长期 Candidate Experience 研究数据库与交互地图">
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">HOKKAIDO · 05—18 SEP 2026</p>
+      <h1>Candidate Experience 研究地图</h1>
+    </div>
+    <div class="summary" aria-live="polite">
+      <strong id="visibleCount">—</strong><span>当前候选</span>
+      <strong id="markerCount">—</strong><span>已核验坐标</span>
+    </div>
+  </header>
+
+  <nav class="view-tabs" aria-label="地图图层">
+    <button class="tab active" data-view="all">全部 Candidates</button>
+    <button class="tab" data-view="regions">按地区查看</button>
+    <span id="routeTabs"></span>
+  </nav>
+
+  <main class="workspace">
+    <aside class="filters" aria-label="研究筛选">
+      <div class="filter-heading">
+        <h2>研究筛选</h2>
+        <button id="resetFilters" class="text-button">重置</button>
+      </div>
+      <label>搜索<input id="search" type="search" placeholder="名称、ID、地区、体验内容"></label>
+      <div class="filter-grid">
+        <label>Normalized category<select id="category"><option value="">全部</option></select></label>
+        <label>Region<select id="region"><option value="">全部</option></select></label>
+        <label>L1 status<select id="l1Status"><option value="">全部</option></select></label>
+        <label>L1 batch<select id="l1Batch"><option value="">全部</option></select></label>
+        <label>Trip-window fit<select id="tripWindowFit"><option value="">全部</option></select></label>
+      </div>
+      <fieldset>
+        <legend>研究状态</legend>
+        <label class="check"><input type="checkbox" id="dynamicRecheck"> 需要动态复核</label>
+        <label class="check"><input type="checkbox" id="visualEvidence"> 已有视觉证据</label>
+        <label class="check"><input type="checkbox" id="uncertainty"> 存在明确不确定项</label>
+      </fieldset>
+      <fieldset>
+        <legend>类别快捷筛选</legend>
+        <div id="typeChips" class="chips"></div>
+      </fieldset>
+      <p class="filter-note">这里不做排名。旧评分仅作为历史研究判断保留；未知值显示为“未研究 / unknown / L1 pending”。</p>
+    </aside>
+
+    <section class="map-stage" aria-label="地图">
+      <div id="map"></div>
+      <div id="mapNotice" class="map-notice" hidden></div>
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <section class="candidate-rail" aria-label="候选地点列表">
+      <div class="rail-heading"><h2>候选体验</h2><span id="railCount"></span></div>
+      <div id="candidateList" class="candidate-list"></div>
+    </section>
+  </main>
+
+  <dialog id="detailDialog" class="detail-dialog">
+    <button id="closeDetail" class="close-button" aria-label="关闭详情">×</button>
+    <article id="detailContent"></article>
+  </dialog>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="data-adapter.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

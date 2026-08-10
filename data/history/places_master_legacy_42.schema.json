@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.example/hokkaido/places_master.schema.json",
+  "title": "Hokkaido Travel Places Master",
+  "type": "object",
+  "required": ["schema_version", "record_count", "records"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "database_type": { "type": "string" },
+    "trip": { "type": "object" },
+    "record_count": { "type": "integer", "minimum": 0 },
+    "fields": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "records": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/place" }
+    }
+  },
+  "$defs": {
+    "nullableScore": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 10
+    },
+    "nullableString": { "type": ["string", "null"] },
+    "photo": {
+      "type": "object",
+      "required": ["url", "source_url", "caption", "credit"],
+      "properties": {
+        "url": { "type": "string" },
+        "source_url": { "type": "string" },
+        "caption": { "type": "string" },
+        "credit": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "place": {
+      "type": "object",
+      "required": [
+        "unique_id", "name_zh", "name_ja", "name_en", "category", "region",
+        "latitude", "longitude", "coordinate_verification_status",
+        "experience_quality", "fit_to_user", "route_shaping_power", "season_fit",
+        "season_uniqueness", "public_transport_friction", "luggage_friction",
+        "physical_load", "weather_risk", "evidence_confidence", "decision_status",
+        "decision_reason", "reconsider_if", "photos", "photo_sources", "created_at",
+        "updated_at", "source_research_ids"
+      ],
+      "properties": {
+        "unique_id": { "type": "string", "minLength": 1 },
+        "name_zh": { "type": "string" },
+        "name_ja": { "type": "string" },
+        "name_en": { "type": "string" },
+        "category": { "type": "string" },
+        "region": { "type": "string" },
+        "latitude": { "type": ["number", "null"], "minimum": -90, "maximum": 90 },
+        "longitude": { "type": ["number", "null"], "minimum": -180, "maximum": 180 },
+        "coordinate_verification_status": { "type": "string" },
+        "September_fit": { "$ref": "#/$defs/nullableScore" },
+        "overall_experience_potential": { "$ref": "#/$defs/nullableScore" },
+        "experience_quality": { "$ref": "#/$defs/nullableScore" },
+        "fit_to_user": { "$ref": "#/$defs/nullableScore" },
+        "route_shaping_power": { "$ref": "#/$defs/nullableScore" },
+        "season_fit": { "$ref": "#/$defs/nullableScore" },
+        "season_uniqueness": { "$ref": "#/$defs/nullableScore" },
+        "public_transport_friction": { "$ref": "#/$defs/nullableScore" },
+        "luggage_friction": { "$ref": "#/$defs/nullableScore" },
+        "physical_load": { "$ref": "#/$defs/nullableScore" },
+        "weather_risk": { "$ref": "#/$defs/nullableScore" },
+        "evidence_confidence": { "$ref": "#/$defs/nullableScore" },
+        "decision_status": { "$ref": "#/$defs/nullableString" },
+        "decision_reason": { "$ref": "#/$defs/nullableString" },
+        "reconsider_if": { "$ref": "#/$defs/nullableString" },
+        "why_now": { "$ref": "#/$defs/nullableString" },
+        "why_not_now": { "$ref": "#/$defs/nullableString" },
+        "photos": { "type": "array", "items": { "$ref": "#/$defs/photo" } },
+        "photo_sources": { "type": "array" },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" },
+        "source_research_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+      },
+      "additionalProperties": true
+    }
+  }
+}

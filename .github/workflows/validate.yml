@@ -1,0 +1,25 @@
+name: Structural validation
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate canonical structure and overlays
+        run: python scripts/validate_data.py
+      - name: Run dependency-free project tests
+        run: python scripts/test_project.py
+      - name: Parse JSON artifacts
+        run: python -m json.tool data/hokkaido_places_master.json > /dev/null && python -m json.tool data/candidate_locations.json > /dev/null && python -m json.tool data/research_batches_level1.json > /dev/null
+      - name: Check JavaScript syntax
+        run: node --check web/data-adapter.js && node --check web/app.js
