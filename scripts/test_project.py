@@ -127,6 +127,8 @@ def main() -> int:
     app_text = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
     adapter_text = (ROOT / "web" / "data-adapter.js").read_text(encoding="utf-8")
     index_text = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
+    loader_text = (ROOT / "web" / "google-maps-loader.js").read_text(encoding="utf-8")
+    pages_text = (ROOT / ".github" / "workflows" / "pages.yml").read_text(encoding="utf-8")
     if "hokkaido_places_master.json" not in app_text:
         failures.append("web app does not consume the current canonical filename")
     if "places_master.json" in app_text.replace("hokkaido_places_master.json", ""):
@@ -149,7 +151,22 @@ def main() -> int:
         failures.append("typed Candidate map colors or selected-area zoom behavior is missing")
     if "在 Google Maps 打开" in index_text + app_text or "google_maps_url" in app_text:
         failures.append("deferred Google Maps external-open feature was added")
-    if "export" in app_text.lower() or "import" in app_text.lower():
+    if "AutocompleteSuggestion.fetchAutocompleteSuggestions" not in app_text or "AutocompleteSessionToken" not in app_text:
+        failures.append("live Google Maps area autocomplete with billing sessions is missing")
+    if 'includedPrimaryTypes: ["(regions)"]' not in app_text or 'includedRegionCodes: ["jp"]' not in app_text:
+        failures.append("live search is not restricted to Japanese city/area results")
+    if 'fields: ["id", "displayName", "formattedAddress", "location", "primaryType"]' not in app_text:
+        failures.append("selected live area does not fetch the required identity and coordinate fields")
+    if 'mapProvider = "google"' not in app_text or 'importLibrary("maps")' not in app_text:
+        failures.append("Google Places results are not paired with a Google map")
+    if "google-maps-config.js" not in index_text or "google-maps-loader.js" not in index_text:
+        failures.append("Google Maps runtime configuration is not loaded by the web app")
+    if "GOOGLE_MAPS_API_KEY" not in pages_text or "secrets.GOOGLE_MAPS_API_KEY" not in pages_text:
+        failures.append("Pages deployment does not inject the restricted browser key")
+    if "AIza" in app_text + loader_text + index_text + pages_text:
+        failures.append("a Google Maps browser key was committed directly to source")
+    deferred_transfer_hooks = ("exportTrip", "importTrip", "data-export-trip", "data-import-trip")
+    if any(hook in app_text for hook in deferred_transfer_hooks):
         failures.append("deferred trip data import/export feature was added")
     if (ROOT / "data" / "places_master.json").exists():
         failures.append("legacy places_master.json remains as a competing current canonical")

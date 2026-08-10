@@ -23,6 +23,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Configure Google Maps browser key
+        env:
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+        run: |
+          if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
+            echo "GOOGLE_MAPS_API_KEY repository secret is required."
+            exit 1
+          fi
+          node -e 'require("fs").writeFileSync("web/google-maps-config.js", `window.GOOGLE_MAPS_CONFIG = ${JSON.stringify({apiKey: process.env.GOOGLE_MAPS_API_KEY})};\n`)'
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .

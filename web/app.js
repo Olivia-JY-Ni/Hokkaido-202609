@@ -4,6 +4,7 @@ const state = {
   expandedAreas: new Set(), showAreas: true, showCandidates: false,
   candidateQuery: "", candidateCategory: "", candidateUnassignedOnly: false,
   searchPreview: null, pickerAreaId: null, pickerSelection: new Set(), draggedAreaId: null,
+  livePredictions: [], placesReady: false, searchSessionToken: null, searchRequestId: 0,
 };
 const $ = id => document.getElementById(id);
 const CATEGORY_LABELS = {
@@ -63,10 +64,30 @@ function fillCategorySelect(select) {
   });
 }
 
-let map, areaLayer, candidateLayer, routeLayer, previewLayer;
+let map, mapProvider = "leaflet", areaLayer, candidateLayer, routeLayer, previewLayer, searchTimer;
 const areaMarkers = new Map();
 const candidateMarkers = new Map();
-function initMap() {
+async function initMap() {
+  const googleMaps = await (window.googleMapsReady || Promise.resolve(null));
+  if (googleMaps) {
+    const { Map: GoogleMap } = await google.maps.importLibrary("maps");
+    mapProvider = "google";
+    map = new GoogleMap($("map"), {
+      center: { lat: 43.35, lng: 142.15 }, zoom: 6,
+      mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
+      clickableIcons: false, gestureHandling: "greedy",
+    });
+    areaLayer = []; candidateLayer = []; routeLayer = []; previewLayer = [];
+    try {
+      await google.maps.importLibrary("places");
+      state.placesReady = true;
+    } catch (_) {
+      state.placesReady = false;
+    }
+    return;
+  }
+
+  mapProvider = "leaflet";
   map = L.map("map", { zoomControl: true, attributionControl: true }).setView([43.35, 142.15], 6);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 18, attribution: "© OpenStreetMap",
@@ -74,8 +95,27 @@ function initMap() {
   routeLayer = L.layerGroup().addTo(map); areaLayer = L.layerGroup().addTo(map);
   candidateLayer = L.layerGroup().addTo(map); previewLayer = L.layerGroup().addTo(map);
 }
+function clearMapLayer(layer) {
+  if (mapProvider === "google") {
+    layer.forEach(item => item.setMap(null));
+    layer.length = 0;
+  } else {
+    layer.clearLayers();
+  }
+}
 function areaIcon(selected = false, muted = false) {
   return L.divIcon({ className: `area-map-marker${selected ? " is-selected" : ""}${muted ? " is-muted" : ""}`, html: '<span aria-label="行程地区">⭐</span>', iconSize: selected ? [38,38] : [32,32], iconAnchor: selected ? [19,32] : [16,27] });
+}
+function googleAreaIcon(selected = false, muted = false) {
+  return {
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE, scale: selected ? 19 : 16,
+      fillColor: selected ? "#ffefd0" : "#e8f2ee", fillOpacity: muted ? .55 : 1,
+      strokeColor: "#ffffff", strokeWeight: 2,
+    },
+    label: { text: "⭐", fontSize: selected ? "21px" : "18px" },
+    opacity: muted ? .48 : 1,
+  };
 }
 function renderLegend(items) {
   const categories = [...new Set(items.map(item => item.category))];
@@ -89,35 +129,70 @@ function mapCandidates() {
   return state.candidates.filter(validCoordinates);
 }
 function renderMap({ fit = false } = {}) {
-  areaLayer.clearLayers(); candidateLayer.clearLayers(); routeLayer.clearLayers(); previewLayer.clearLayers();
+  clearMapLayer(areaLayer); clearMapLayer(candidateLayer); clearMapLayer(routeLayer); clearMapLayer(previewLayer);
   areaMarkers.clear(); candidateMarkers.clear();
   const selected = areaById(state.selectedAreaId);
   const points = [];
   if (state.showAreas) {
     state.areas.forEach(area => {
       const isSelected = area.id === state.selectedAreaId;
-      const marker = L.marker([area.lat, area.lon], { icon: areaIcon(isSelected, Boolean(selected && !isSelected)), zIndexOffset: isSelected ? 1000 : 500 });
-      marker.bindTooltip(area.name, { direction: "top", offset: [0,-23] });
-      marker.on("click", () => selectArea(area.id)); marker.addTo(areaLayer); areaMarkers.set(area.id, marker);
-      if (!selected || isSelected) points.push([area.lat, area.lon]);
+      let marker;
+      if (mapProvider === "google") {
+        marker = new google.maps.Marker({
+          position: { lat: area.lat, lng: area.lon }, map, title: area.name,
+          zIndex: isSelected ? 1000 : 500, ...googleAreaIcon(isSelected, Boolean(selected && !isSelected)),
+        });
+        marker.addListener("click", () => selectArea(area.id)); areaLayer.push(marker);
+      } else {
+        marker = L.marker([area.lat, area.lon], { icon: areaIcon(isSelected, Boolean(selected && !isSelected)), zIndexOffset: isSelected ? 1000 : 500 });
+        marker.bindTooltip(area.name, { direction: "top", offset: [0,-23] });
+        marker.on("click", () => selectArea(area.id)); marker.addTo(areaLayer);
+      }
+      areaMarkers.set(area.id, marker);
+      if (!selected || isSelected) points.push({ lat: area.lat, lng: area.lon });
     });
     if (!selected && state.areas.length > 1) {
-      L.polyline(state.areas.map(area => [area.lat, area.lon]), { color: "#346c58", weight: 3, opacity: .55, dashArray: "7 8" }).addTo(routeLayer);
+      if (mapProvider === "google") {
+        const route = new google.maps.Polyline({ path: state.areas.map(area => ({ lat: area.lat, lng: area.lon })), map, strokeColor: "#346c58", strokeWeight: 3, strokeOpacity: .55 });
+        routeLayer.push(route);
+      } else {
+        L.polyline(state.areas.map(area => [area.lat, area.lon]), { color: "#346c58", weight: 3, opacity: .55, dashArray: "7 8" }).addTo(routeLayer);
+      }
     }
   }
   const visibleCandidates = mapCandidates();
   visibleCandidates.forEach(item => {
     const color = COLORS[item.category] || "#687d86";
-    const marker = L.circleMarker([item.location.lat, item.location.lon], { radius: 7, color: "#fff", weight: 2, fillColor: color, fillOpacity: .96, className: "candidate-map-marker" });
-    marker.bindTooltip(item.name, { direction: "top" }); marker.on("click", () => openCandidate(item.id));
-    marker.addTo(candidateLayer); candidateMarkers.set(item.id, marker); points.push([item.location.lat, item.location.lon]);
+    let marker;
+    if (mapProvider === "google") {
+      marker = new google.maps.Marker({
+        position: { lat: item.location.lat, lng: item.location.lon }, map, title: item.name,
+        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: color, fillOpacity: .96, strokeColor: "#fff", strokeWeight: 2 },
+      });
+      marker.addListener("click", () => openCandidate(item.id)); candidateLayer.push(marker);
+    } else {
+      marker = L.circleMarker([item.location.lat, item.location.lon], { radius: 7, color: "#fff", weight: 2, fillColor: color, fillOpacity: .96, className: "candidate-map-marker" });
+      marker.bindTooltip(item.name, { direction: "top" }); marker.on("click", () => openCandidate(item.id));
+      marker.addTo(candidateLayer);
+    }
+    candidateMarkers.set(item.id, marker); points.push({ lat: item.location.lat, lng: item.location.lon });
   });
   renderLegend(visibleCandidates);
   if (fit) {
-    if (selected && visibleCandidates.length === 0) map.setView([selected.lat, selected.lon], 10, { animate: true });
-    else if (points.length === 1) map.setView(points[0], selected ? 11 : 8, { animate: true });
-    else if (points.length > 1) map.fitBounds(L.latLngBounds(points).pad(.18), { maxZoom: selected ? 12 : 9, animate: true });
-    else map.setView([43.35, 142.15], 6, { animate: true });
+    if (mapProvider === "google") {
+      if (selected && visibleCandidates.length === 0) { map.setCenter({ lat: selected.lat, lng: selected.lon }); map.setZoom(10); }
+      else if (points.length === 1) { map.setCenter(points[0]); map.setZoom(selected ? 11 : 8); }
+      else if (points.length > 1) {
+        const bounds = new google.maps.LatLngBounds(); points.forEach(point => bounds.extend(point)); map.fitBounds(bounds, 72);
+        google.maps.event.addListenerOnce(map, "idle", () => { const maxZoom = selected ? 12 : 9; if (map.getZoom() > maxZoom) map.setZoom(maxZoom); });
+      } else { map.setCenter({ lat: 43.35, lng: 142.15 }); map.setZoom(6); }
+    } else {
+      const leafletPoints = points.map(point => [point.lat, point.lng]);
+      if (selected && visibleCandidates.length === 0) map.setView([selected.lat, selected.lon], 10, { animate: true });
+      else if (points.length === 1) map.setView(leafletPoints[0], selected ? 11 : 8, { animate: true });
+      else if (points.length > 1) map.fitBounds(L.latLngBounds(leafletPoints).pad(.18), { maxZoom: selected ? 12 : 9, animate: true });
+      else map.setView([43.35, 142.15], 6, { animate: true });
+    }
   }
   renderMapFocusCard();
 }
@@ -176,21 +251,91 @@ function catalogMatches(query) {
   const value = query.trim().toLowerCase(); if (!value) return [];
   return state.catalog.filter(place => [place.name_zh, place.google_title, place.formatted_address, ...(place.search_terms || [])].join(" ").toLowerCase().includes(value)).slice(0, 8);
 }
-function renderAreaSearchResults() {
-  const query = $("areaSearch").value; $("clearAreaSearch").hidden = !query;
-  if (!query.trim()) { $("areaSearchResults").hidden = true; return; }
+function renderCatalogSearchResults(query, apiUnavailable = false) {
   const results = catalogMatches(query);
-  $("areaSearchResults").innerHTML = results.length ? results.map(place => `<button class="search-result" data-preview-place="${esc(place.place_id)}"><span class="result-pin">⌖</span><span><strong>${esc(place.name_zh)}</strong><p>${esc(place.formatted_address)}</p></span><span class="provider-tag">Google Maps</span></button>`).join("") : '<div class="search-empty">当前已核对的 Google Maps 地区中没有匹配结果</div>';
+  state.livePredictions = [];
+  $("areaSearchResults").innerHTML = results.length ? results.map(place => `<button class="search-result" data-preview-place="${esc(place.place_id)}"><span class="result-pin">⌖</span><span><strong>${esc(place.name_zh)}</strong><p>${esc(place.formatted_address)}</p></span><span class="provider-tag">${apiUnavailable ? "已核对库" : "Google Maps"}</span></button>`).join("") : `<div class="search-empty">${apiUnavailable ? "实时搜索暂时不可用，已核对地区中也没有匹配结果" : "没有匹配的市或地区"}</div>`;
   $("areaSearchResults").hidden = false;
+}
+function renderLiveSearchResults(predictions) {
+  state.livePredictions = predictions;
+  $("areaSearchResults").innerHTML = predictions.length ? predictions.map((prediction, index) => `<button class="search-result" data-preview-live-place="${index}"><span class="result-pin">⌖</span><span><strong>${esc(prediction.mainText?.toString() || prediction.text.toString())}</strong><p>${esc(prediction.secondaryText?.toString() || "日本")}</p></span><span class="provider-tag">Google Maps</span></button>`).join("") : '<div class="search-empty">Google Maps 中没有匹配的市或地区</div>';
+  $("areaSearchResults").hidden = false;
+}
+async function renderAreaSearchResults() {
+  const query = $("areaSearch").value; $("clearAreaSearch").hidden = !query;
+  const trimmed = query.trim();
+  if (!trimmed) { state.livePredictions = []; state.searchSessionToken = null; $("areaSearchResults").hidden = true; return; }
+  if (!state.placesReady || mapProvider !== "google") return renderCatalogSearchResults(trimmed, true);
+
+  const requestId = ++state.searchRequestId;
+  $("areaSearchResults").innerHTML = '<div class="search-empty">正在搜索 Google Maps…</div>';
+  $("areaSearchResults").hidden = false;
+  try {
+    const { AutocompleteSessionToken, AutocompleteSuggestion } = await google.maps.importLibrary("places");
+    if (!state.searchSessionToken) state.searchSessionToken = new AutocompleteSessionToken();
+    const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+      input: trimmed,
+      sessionToken: state.searchSessionToken,
+      includedPrimaryTypes: ["(regions)"],
+      includedRegionCodes: ["jp"],
+      locationBias: { center: { lat: 43.35, lng: 142.15 }, radius: 850000 },
+      language: "zh-CN",
+      region: "jp",
+    });
+    if (requestId !== state.searchRequestId || $("areaSearch").value.trim() !== trimmed) return;
+    renderLiveSearchResults(suggestions.map(item => item.placePrediction).filter(Boolean).slice(0, 8));
+  } catch (_) {
+    if (requestId === state.searchRequestId) renderCatalogSearchResults(trimmed, true);
+  }
+}
+function scheduleAreaSearch() {
+  clearTimeout(searchTimer);
+  state.searchRequestId += 1;
+  const query = $("areaSearch").value;
+  $("clearAreaSearch").hidden = !query;
+  if (!query.trim()) return void renderAreaSearchResults();
+  searchTimer = setTimeout(renderAreaSearchResults, 280);
 }
 function previewPlace(placeId) {
   const place = state.catalog.find(item => item.place_id === placeId); if (!place) return;
+  showPlacePreview(place);
+}
+async function previewLivePlace(index) {
+  const prediction = state.livePredictions[index]; if (!prediction) return;
+  $("areaSearchResults").innerHTML = '<div class="search-empty">正在确认地区…</div>';
+  try {
+    const place = prediction.toPlace();
+    await place.fetchFields({ fields: ["id", "displayName", "formattedAddress", "location", "primaryType"] });
+    if (!place.location) throw new Error("missing location");
+    state.searchSessionToken = null;
+    showPlacePreview({
+      place_id: place.id,
+      name_zh: place.displayName || prediction.mainText?.toString() || prediction.text.toString(),
+      google_title: place.displayName || prediction.text.toString(),
+      formatted_address: place.formattedAddress || prediction.secondaryText?.toString() || "日本",
+      lat: place.location.lat(), lon: place.location.lng(), place_type: place.primaryType || "city_or_area",
+    });
+  } catch (_) {
+    $("areaSearchResults").innerHTML = '<div class="search-empty">无法读取这个地区，请重新搜索</div>';
+    $("areaSearchResults").hidden = false;
+  }
+}
+function showPlacePreview(place) {
   state.searchPreview = place; $("areaSearchResults").hidden = true; $("mapFocusCard").hidden = true;
   const existing = state.areas.find(area => area.placeId === place.place_id);
   $("placePreview").innerHTML = `<div class="preview-top"><div class="preview-symbol">⌖</div><div class="preview-copy"><p class="preview-meta">GOOGLE MAPS · CITY / AREA</p><h3>${esc(place.name_zh)}</h3><p>${esc(place.formatted_address)}</p></div></div><div class="preview-actions"><button class="primary-button" data-add-preview-place>${existing ? "查看已加入地区" : "加入行程 ⭐"}</button><button class="secondary-button" data-dismiss-preview>取消</button></div>`;
-  $("placePreview").hidden = false; previewLayer.clearLayers();
-  L.circleMarker([place.lat, place.lon], { radius: 10, color: "#fff", weight: 3, fillColor: "#1f6b53", fillOpacity: 1 }).addTo(previewLayer);
-  map.setView([place.lat, place.lon], 9, { animate: true });
+  $("placePreview").hidden = false; clearMapLayer(previewLayer);
+  if (mapProvider === "google") {
+    const marker = new google.maps.Marker({
+      position: { lat: place.lat, lng: place.lon }, map, title: place.name_zh,
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 10, fillColor: "#1f6b53", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 3 },
+    });
+    previewLayer.push(marker); map.setCenter({ lat: place.lat, lng: place.lon }); map.setZoom(9);
+  } else {
+    L.circleMarker([place.lat, place.lon], { radius: 10, color: "#fff", weight: 3, fillColor: "#1f6b53", fillOpacity: 1 }).addTo(previewLayer);
+    map.setView([place.lat, place.lon], 9, { animate: true });
+  }
 }
 function addPreviewPlace() {
   const place = state.searchPreview; if (!place) return;
@@ -201,7 +346,7 @@ function addPreviewPlace() {
   state.expandedAreas.add(id); state.selectedAreaId = id; state.showAreas = true; state.showCandidates = true;
   dismissPreview(); saveUserState(); renderAll({ fitMap: true });
 }
-function dismissPreview() { state.searchPreview = null; $("placePreview").hidden = true; previewLayer.clearLayers(); renderMapFocusCard(); }
+function dismissPreview() { state.searchPreview = null; $("placePreview").hidden = true; clearMapLayer(previewLayer); renderMapFocusCard(); }
 
 function openPicker(areaId) {
   const area = areaById(areaId); if (!area) return;
@@ -249,9 +394,15 @@ function switchView(view) {
 }
 function setupInteractions() {
   document.querySelectorAll(".panel-tab").forEach(tab => tab.addEventListener("click", () => switchView(tab.dataset.view)));
-  $("areaSearch").addEventListener("input", renderAreaSearchResults);
-  $("clearAreaSearch").addEventListener("click", () => { $("areaSearch").value = ""; renderAreaSearchResults(); dismissPreview(); });
-  $("areaSearchResults").addEventListener("click", event => { const button = event.target.closest("[data-preview-place]"); if (button) previewPlace(button.dataset.previewPlace); });
+  $("areaSearch").addEventListener("input", scheduleAreaSearch);
+  $("areaSearch").addEventListener("keydown", event => { if (event.key === "Escape") { $("areaSearch").value = ""; scheduleAreaSearch(); dismissPreview(); } });
+  $("clearAreaSearch").addEventListener("click", () => { $("areaSearch").value = ""; scheduleAreaSearch(); dismissPreview(); $("areaSearch").focus(); });
+  $("areaSearchResults").addEventListener("click", event => {
+    const liveButton = event.target.closest("[data-preview-live-place]");
+    if (liveButton) return void previewLivePlace(Number(liveButton.dataset.previewLivePlace));
+    const catalogButton = event.target.closest("[data-preview-place]");
+    if (catalogButton) previewPlace(catalogButton.dataset.previewPlace);
+  });
   $("placePreview").addEventListener("click", event => { if (event.target.closest("[data-add-preview-place]")) addPreviewPlace(); if (event.target.closest("[data-dismiss-preview]")) dismissPreview(); });
   $("mapFocusCard").addEventListener("click", event => { if (event.target.closest("[data-clear-area-focus]")) clearAreaFocus(); });
   $("toggleAreaLayer").addEventListener("click", () => { state.showAreas = !state.showAreas; renderMap(); updateLayerButtons(); });
@@ -288,7 +439,7 @@ async function boot() {
     const responses = await Promise.all(paths.map(path => fetch(path))); if (responses.some(response => !response.ok)) throw new Error("数据文件无法读取");
     const [master,locations,batches,catalog] = await Promise.all(responses.map(response => response.json()));
     state.candidates = window.ResearchDataAdapter.buildCandidateViewModels(master,locations,batches); state.catalog = catalog.places || [];
-    loadUserState(); fillCategorySelect($("candidateCategory")); fillCategorySelect($("pickerCategory")); initMap(); setupInteractions(); renderAll({ fitMap: true });
+    loadUserState(); fillCategorySelect($("candidateCategory")); fillCategorySelect($("pickerCategory")); await initMap(); setupInteractions(); renderAll({ fitMap: true });
   } catch (error) {
     $("areaList").innerHTML = `<div class="empty-state"><h3>无法载入地图数据</h3><p>${esc(error.message)}</p></div>`;
   }

@@ -4,3 +4,4 @@ __pycache__/
 data/*.tmp
 .pytest_cache/
 .server.pid
+web/google-maps-config.js
