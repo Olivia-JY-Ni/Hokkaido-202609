@@ -21,6 +21,8 @@ def main() -> None:
     master = load_json(MASTER_PATH)
     legacy = load_json(LEGACY_PATH)
     legacy_by_id = {row["unique_id"]: row for row in legacy["records"]}
+    existing = load_json(OUTPUT_PATH) if OUTPUT_PATH.exists() else {"locations": []}
+    existing_by_id = {row["candidate_id"]: row for row in existing.get("locations", [])}
 
     locations = []
     verified_count = 0
@@ -28,27 +30,36 @@ def main() -> None:
         candidate_id = candidate["candidate_id"]
         old = legacy_by_id.get(candidate_id)
         source = (old or {}).get("coordinate_source") or {}
-        verified = bool(
+        legacy_verified = bool(
             old
             and old.get("coordinate_verification_status") == "verified"
             and isinstance(old.get("latitude"), (int, float))
             and isinstance(old.get("longitude"), (int, float))
         )
+        current = existing_by_id.get(candidate_id, {})
+        current_verified = current.get("verification_status") == "verified"
+        verified = legacy_verified or current_verified
         if verified:
             verified_count += 1
-        locations.append(
-            {
+        if legacy_verified:
+            locations.append({
                 "candidate_id": candidate_id,
-                "lat": old.get("latitude") if verified else None,
-                "lon": old.get("longitude") if verified else None,
-                "scope": old.get("coordinate_scope") if verified else None,
-                "verification_status": "verified" if verified else "unresolved",
-                "provider": source.get("provider") if verified else None,
-                "provider_place_id": source.get("google_place_id") if verified else None,
-                "source_url": source.get("source_url") if verified else None,
-                "verified_at": source.get("verified_at") if verified else None,
-            }
-        )
+                "lat": old.get("latitude"), "lon": old.get("longitude"),
+                "scope": old.get("coordinate_scope"), "verification_status": "verified",
+                "provider": source.get("provider"), "provider_place_id": source.get("google_place_id"),
+                "source_url": source.get("source_url"), "verified_at": source.get("verified_at"),
+            })
+        elif current_verified:
+            locations.append({key: current.get(key) for key in (
+                "candidate_id", "lat", "lon", "scope", "verification_status", "provider",
+                "provider_place_id", "source_url", "verified_at",
+            )})
+        else:
+            locations.append({
+                "candidate_id": candidate_id, "lat": None, "lon": None, "scope": None,
+                "verification_status": "unresolved", "provider": None, "provider_place_id": None,
+                "source_url": None, "verified_at": None,
+            })
 
     payload = {
         "schema_version": "1.0.0",
@@ -56,7 +67,7 @@ def main() -> None:
             "canonical": "data/hokkaido_places_master.json",
             "legacy_coordinate_source": "data/history/places_master_legacy_42.json",
         },
-        "policy": "Coordinates are a separate technical overlay. Unresolved values are never guessed.",
+        "policy": existing.get("policy", "Coordinates are a separate technical overlay. Unresolved values are never guessed."),
         "summary": {
             "candidate_total": len(locations),
             "verified": verified_count,
@@ -64,6 +75,8 @@ def main() -> None:
         },
         "locations": locations,
     }
+    if existing.get("last_google_maps_review"):
+        payload["last_google_maps_review"] = existing["last_google_maps_review"]
     OUTPUT_PATH.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )

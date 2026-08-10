@@ -9,7 +9,8 @@ The migration input of record is the external `../data/hokkaido_places_master.js
 - `data/hokkaido_places_master.json` — current nested Candidate Experience canonical (77 Candidates).
 - `data/candidate_research_schema.md` — research and append-only merge contract.
 - `data/research_batches_level1.json` — 10 exact-ID Level 1 batches.
-- `data/candidate_locations.json` — separate technical coordinate overlay; 42 historical Google Maps coordinates are verified and 35 new Candidates remain unresolved.
+- `data/candidate_locations.json` — separate technical coordinate overlay; all 77 Candidates have Google Maps-verified coordinates. The 42 historical points are preserved, and 35 newer points were verified on 2026-08-10.
+- `data/google_maps_coordinate_review_current.json` — title, address, prefecture, coordinate, Place ID, query, scope, and automated cross-check evidence for the 35 newer points.
 - `data/routes.json` — stable-ID route container, currently intentionally unplanned.
 - `data/history/` — former flat 42-record canonical, former schema, and coordinate-review artifacts. Historical only.
 - `research_inbox/` — incoming independent research deltas. Applying never deletes an inbox file.
@@ -17,7 +18,7 @@ The migration input of record is the external `../data/hokkaido_places_master.js
 
 The current structural invariants are 77 inventory entities, 73 Level 1-eligible subjects, 4 aggregate context modules, 12 Japan Challenger/Near-miss modules, and 10 Level 1 batches. Every eligible ID occurs in exactly one batch. `R2-KUS-004` and `R2-KUS-005` remain distinct restaurants.
 
-Coordinates are not part of the research schema and must never be guessed into it. A verified location row records `candidate_id`, latitude/longitude, point scope, verification status, provider, provider place ID, source URL, and verification timestamp. Unknown locations remain null and `unresolved`.
+Coordinates are not part of the research schema and must never be guessed into it. A verified location row records `candidate_id`, latitude/longitude, point scope, verification status, provider, provider Place ID, source URL, and verification timestamp. Concrete venues use their exact entity; transport and regional modules use documented representative origins, hubs, ports, or event centres.
 
 ## Level 1 delta workflow
 

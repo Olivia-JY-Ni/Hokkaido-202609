@@ -1,0 +1,816 @@
+{
+  "provider": "Google Maps",
+  "created_at": "2026-08-10T16:46:15+08:00",
+  "policy": "Codex verifies exact entity title, expected prefecture, Japan bounds, Place ID, and representative scope before apply.",
+  "results": [
+    {
+      "candidate_id": "R2-SAP-001",
+      "query": "Hokkaido University Museum Sapporo",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "北海道大学総合博物館"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Hokkaido+University+Museum+Sapporo&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Hokkaido+University+Museum+Sapporo&query_place_id=ChIJB-QPugkpC18RCXiUP_vfCIs",
+      "google_title": "北海道大学総合博物館",
+      "google_address": "日本、〒060-0810 北海道札幌市北区北１０条西８丁目 北海道大学総合博物館",
+      "google_place_id": "ChIJB-QPugkpC18RCXiUP_vfCIs",
+      "latitude": 43.0726371,
+      "longitude": 141.3421809,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "R2-SAP-002",
+      "query": "Nemuro Hanamaru JR Tower Stellar Place",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "根室花まる"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Nemuro+Hanamaru+JR+Tower+Stellar+Place&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Nemuro+Hanamaru+JR+Tower+Stellar+Place&query_place_id=ChIJo4R12HQpC18RMlI-QkjBrEc",
+      "google_title": "回転寿司根室花まる JRタワーステラプレイス店",
+      "google_address": "日本、〒060-0005 北海道札幌市中央区北５条西４丁目 JRタワーステラプレイス ６階 回転寿司根室花まる JRタワーステラプレイス店",
+      "google_place_id": "ChIJo4R12HQpC18RMlI-QkjBrEc",
+      "latitude": 43.0679281,
+      "longitude": 141.3501447,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "R2-SAP-003",
+      "query": "Parfait Coffee Liquor Sasaki Sapporo",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "佐々木"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Parfait+Coffee+Liquor+Sasaki+Sapporo&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Parfait+Coffee+Liquor+Sasaki+Sapporo&query_place_id=ChIJq6o2AIMpC18RWWxDKMY9IUc",
+      "google_title": "パフェ、珈琲、酒、佐々木",
+      "google_address": "日本、〒060-0062 北海道札幌市中央区南２条西１丁目８−２ アスカビル パフェ、珈琲、酒、佐々木",
+      "google_place_id": "ChIJq6o2AIMpC18RWWxDKMY9IUc",
+      "latitude": 43.0582599,
+      "longitude": 141.3568744,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "R2-ASH-001",
+      "query": "Asahikawa Design Center",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "旭川デザインセンター"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Asahikawa+Design+Center&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Asahikawa+Design+Center&query_place_id=ChIJV1nVpwLkDF8RP9q07WWoLn0",
+      "google_title": "旭川デザインセンター",
+      "google_address": "日本、〒079-8412 北海道旭川市永山２条１０丁目１−３５ 旭川デザインセンター",
+      "google_place_id": "ChIJV1nVpwLkDF8RP9q07WWoLn0",
+      "latitude": 43.8001702,
+      "longitude": 142.4157344,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "R2-ASH-002",
+      "query": "旭川市博物館",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "旭川市博物館"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=%E6%97%AD%E5%B7%9D%E5%B8%82%E5%8D%9A%E7%89%A9%E9%A4%A8&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=%E6%97%AD%E5%B7%9D%E5%B8%82%E5%8D%9A%E7%89%A9%E9%A4%A8&query_place_id=ChIJtTvlHcvnDF8RkiC5VxTU6WU",
+      "google_title": "旭川市博物館",
+      "google_address": "日本、〒070-8003 北海道旭川市神楽３条７丁目１−４５ 大雪クリスタルホール 内 旭川市博物館",
+      "google_place_id": "ChIJtTvlHcvnDF8RkiC5VxTU6WU",
+      "latitude": 43.7593566,
+      "longitude": 142.3507256,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "R2-ASH-003",
+      "query": "Hachiya Honten Asahikawa",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "蜂屋"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Hachiya+Honten+Asahikawa&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Hachiya+Honten+Asahikawa&query_place_id=ChIJo4bJKBXmDF8R4Mb2Pl5bTaU",
+      "google_title": "ラーメンの蜂屋 本店",
+      "google_address": "日本、〒070-0033 北海道旭川市３条通１５丁目左８ ラーメンの蜂屋 本店",
+      "google_place_id": "ChIJo4bJKBXmDF8R4Mb2Pl5bTaU",
+      "latitude": 43.76452099999999,
+      "longitude": 142.372134,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "R2-ASH-004",
+      "query": "Jiyuken Asahikawa",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "自由軒"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Jiyuken+Asahikawa&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Jiyuken+Asahikawa&query_place_id=ChIJlxKyPw3mDF8Rx1dikCeQ-Bg",
+      "google_title": "自由軒",
+      "google_address": "日本、〒070-0035 北海道旭川市５条通８丁目左2号 自由軒",
+      "google_place_id": "ChIJlxKyPw3mDF8Rx1dikCeQ-Bg",
+      "latitude": 43.7703129,
+      "longitude": 142.3620915,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "R2-SHR-001",
+      "query": "BON'S HOME Shiretoko",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "BON'S HOME",
+        "ボンズホーム"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=BON%27S+HOME+Shiretoko&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=BON%27S+HOME+Shiretoko&query_place_id=ChIJQcLXZ47DbF8R1036xBLtCnQ",
+      "google_title": "ボンズホーム",
+      "google_address": "日本、〒099-4355 北海道斜里郡斜里町ウトロ東２１７ ボンズホーム",
+      "google_place_id": "ChIJQcLXZ47DbF8R1036xBLtCnQ",
+      "latitude": 44.0702884,
+      "longitude": 144.9945563,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "R2-SHR-002",
+      "query": "Namishibuki Utoro",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "波飛沫"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Namishibuki+Utoro&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Namishibuki+Utoro&query_place_id=ChIJhV6DTI7DbF8RbdGynDIpPl0",
+      "google_title": "波飛沫",
+      "google_address": "日本、〒099-4354 北海道斜里郡斜里町ウトロ西１７６−１０ 波飛沫",
+      "google_place_id": "ChIJhV6DTI7DbF8RbdGynDIpPl0",
+      "latitude": 44.0669373,
+      "longitude": 144.9885459,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "R2-SHR-003",
+      "query": "Shiretoko Shokudo Rausu",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "知床食堂"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Shiretoko+Shokudo+Rausu&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Shiretoko+Shokudo+Rausu&query_place_id=ChIJeT6ONwfrbF8RmHAAvH9g9_M",
+      "google_title": "知床食堂（道の駅 知床·らうす）",
+      "google_address": "日本、〒086-1833 北海道目梨郡羅臼町本町３６１−１ 2F 道の駅深層館1F 知床食堂（道の駅 知床·らうす）",
+      "google_place_id": "ChIJeT6ONwfrbF8RmHAAvH9g9_M",
+      "latitude": 44.0172444,
+      "longitude": 145.19201,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "R2-KUS-001",
+      "query": "釧路市立博物館",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "釧路市立博物館"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=%E9%87%A7%E8%B7%AF%E5%B8%82%E7%AB%8B%E5%8D%9A%E7%89%A9%E9%A4%A8&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=%E9%87%A7%E8%B7%AF%E5%B8%82%E7%AB%8B%E5%8D%9A%E7%89%A9%E9%A4%A8&query_place_id=ChIJA2weX1Y9cl8RZasPGV_68bs",
+      "google_title": "釧路市立博物館",
+      "google_address": "日本、〒085-0822 北海道釧路市春湖台１−７ 釧路市立博物館",
+      "google_place_id": "ChIJA2weX1Y9cl8RZasPGV_68bs",
+      "latitude": 42.9745993,
+      "longitude": 144.4033678,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "R2-KUS-002",
+      "query": "Kushiro Washo Market",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "和商市場"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Kushiro+Washo+Market&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Kushiro+Washo+Market&query_place_id=ChIJSeSoNmM9cl8REDYZ-wvPmhE",
+      "google_title": "釧路和商市場",
+      "google_address": "日本、〒085-0018 北海道釧路市黒金町１３丁目２５ 釧路和商市場",
+      "google_place_id": "ChIJSeSoNmM9cl8REDYZ-wvPmhE",
+      "latitude": 42.9892463,
+      "longitude": 144.3799285,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "R2-KUS-003",
+      "query": "Restaurant Izumiya Honten Kushiro",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "泉屋"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Restaurant+Izumiya+Honten+Kushiro&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Restaurant+Izumiya+Honten+Kushiro&query_place_id=ChIJzwZusmA9cl8R4snXeR4XR98",
+      "google_title": "レストラン泉屋 総本店",
+      "google_address": "日本、〒085-0014 北海道釧路市末広町２丁目２−２８ レストラン泉屋 総本店",
+      "google_place_id": "ChIJzwZusmA9cl8R4snXeR4XR98",
+      "latitude": 42.9826735,
+      "longitude": 144.3868352,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "R2-KUS-004",
+      "query": "Robata Renga Kushiro",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "炉ばた煉瓦"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Robata+Renga+Kushiro&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Robata+Renga+Kushiro&query_place_id=ChIJJ5j5Bmc9cl8ReQJJFJakkYo",
+      "google_title": "炉ばた煉瓦",
+      "google_address": "日本、〒085-0016 北海道釧路市錦町３丁目５−３ 炉ばた煉瓦",
+      "google_place_id": "ChIJJ5j5Bmc9cl8ReQJJFJakkYo",
+      "latitude": 42.98252979999999,
+      "longitude": 144.3826731,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "R2-KUS-005",
+      "query": "Robata Kushiro Sakaemachi 3-1",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "炉ばた"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Robata+Kushiro+Sakaemachi+3-1&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Robata+Kushiro+Sakaemachi+3-1&query_place_id=ChIJjcQcwGA9cl8RUSXpHgN8CkI",
+      "google_title": "炉ばた",
+      "google_address": "日本、〒085-0013 北海道釧路市栄町３丁目１ 炉ばた",
+      "google_place_id": "ChIJjcQcwGA9cl8RUSXpHgN8CkI",
+      "latitude": 42.9837224,
+      "longitude": 144.3876844,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "R2-ABA-001",
+      "query": "Hokkaido Museum of Northern Peoples",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "北方民族博物館"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Hokkaido+Museum+of+Northern+Peoples&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Hokkaido+Museum+of+Northern+Peoples&query_place_id=ChIJ-TQ-uhI0bV8Rc_dgugArGqI",
+      "google_title": "北海道立北方民族博物館",
+      "google_address": "日本、〒093-0042 北海道網走市潮見３０９−１ 北海道立北方民族博物館",
+      "google_place_id": "ChIJ-TQ-uhI0bV8Rc_dgugArGqI",
+      "latitude": 43.9968203,
+      "longitude": 144.2397519,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "R2-ABA-002",
+      "query": "Okhotsk Ryuhyokan",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "オホーツク流氷館"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Okhotsk+Ryuhyokan&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Okhotsk+Ryuhyokan&query_place_id=ChIJvwlos3M0bV8RMowNjuqTRP4",
+      "google_title": "オホーツク流氷館",
+      "google_address": "日本、〒093-0044 北海道網走市天都山２４４−３ オホーツク流氷館",
+      "google_place_id": "ChIJvwlos3M0bV8RMowNjuqTRP4",
+      "latitude": 44.0004555,
+      "longitude": 144.2395563,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "R2-FUR-001",
+      "query": "JR 富良野駅",
+      "coordinate_scope": "train_route_origin",
+      "expected_title_tokens": [
+        "富良野駅"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=JR+%E5%AF%8C%E8%89%AF%E9%87%8E%E9%A7%85&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=JR+%E5%AF%8C%E8%89%AF%E9%87%8E%E9%A7%85&query_place_id=ChIJaanaJWlNc18RH0pAMQ_1E5o",
+      "google_title": "富良野駅",
+      "google_address": "日本、〒076-0025 北海道富良野市日の出町１ 富良野駅",
+      "google_place_id": "ChIJaanaJWlNc18RH0pAMQ_1E5o",
+      "latitude": 43.3468945,
+      "longitude": 142.3912825,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "R2-TKA-001",
+      "query": "Obihiro Centennial City Museum",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "帯広百年記念館"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Obihiro+Centennial+City+Museum&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Obihiro+Centennial+City+Museum&query_place_id=ChIJN2DAL9-bc18RNlseuIu0iuY",
+      "google_title": "帯広百年記念館",
+      "google_address": "日本、〒080-0846 北海道帯広市緑ケ丘２ 帯広百年記念館",
+      "google_place_id": "ChIJN2DAL9-bc18RNlseuIu0iuY",
+      "latitude": 42.9070431,
+      "longitude": 143.1863426,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "RM-SAP",
+      "query": "Sapporo Station South Square",
+      "coordinate_scope": "regional_reference_hub",
+      "expected_title_tokens": [
+        "札幌駅南口駅前広場",
+        "Sapporo Station South Square"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Sapporo+Station+South+Square&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Sapporo+Station+South+Square&query_place_id=ChIJnbDUFHUpC18RAPOFjYNZxs8",
+      "google_title": "札幌駅南口駅前広場",
+      "google_address": "日本、〒060-0005 北海道札幌市中央区北５条西４丁目 札幌駅南口駅前広場",
+      "google_place_id": "ChIJnbDUFHUpC18RAPOFjYNZxs8",
+      "latitude": 43.067222,
+      "longitude": 141.3504044,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "RM-ASH",
+      "query": "Asahikawa Station",
+      "coordinate_scope": "regional_reference_hub",
+      "expected_title_tokens": [
+        "旭川駅"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Asahikawa+Station&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Asahikawa+Station&query_place_id=ChIJm1lhlRDmDF8R0oB1-iF1Z2E",
+      "google_title": "旭川駅",
+      "google_address": "日本、〒070-0030 北海道旭川市宮下通８丁目３ 旭川駅",
+      "google_place_id": "ChIJm1lhlRDmDF8R0oB1-iF1Z2E",
+      "latitude": 43.7627619,
+      "longitude": 142.3585105,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "RM-SHR",
+      "query": "Shiretoko World Heritage Conservation Center",
+      "coordinate_scope": "regional_reference_hub",
+      "expected_title_tokens": [
+        "知床世界遺産センター"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Shiretoko+World+Heritage+Conservation+Center&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Shiretoko+World+Heritage+Conservation+Center&query_place_id=ChIJMznhdZLDbF8RK07Nbn0ZfWU",
+      "google_title": "知床世界遺産センター",
+      "google_address": "日本、〒099-4354 北海道斜里郡斜里町ウトロ西１８６−１０ 知床世界遺産センター",
+      "google_place_id": "ChIJMznhdZLDbF8RK07Nbn0ZfWU",
+      "latitude": 44.0694826,
+      "longitude": 144.991301,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "RM-KUS",
+      "query": "Kushiro Station",
+      "coordinate_scope": "regional_reference_hub",
+      "expected_title_tokens": [
+        "釧路駅"
+      ],
+      "expected_address_region": "北海道",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Kushiro+Station&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Kushiro+Station&query_place_id=ChIJ_zA5MX09cl8RqYn127GVk74",
+      "google_title": "釧路駅",
+      "google_address": "日本、〒085-0015 北海道釧路市北大通１４丁目１−７８ 釧路駅",
+      "google_place_id": "ChIJ_zA5MX09cl8RqYn127GVk74",
+      "latitude": 42.9902753,
+      "longitude": 144.382268,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "JP-CH-001",
+      "query": "Kakunodate Station",
+      "coordinate_scope": "regional_reference_hub",
+      "expected_title_tokens": [
+        "角館駅"
+      ],
+      "expected_address_region": "秋田県",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Kakunodate+Station&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Kakunodate+Station&query_place_id=ChIJY8XvokSaj18RdJGtjt2CtcI",
+      "google_title": "角館駅",
+      "google_address": "日本、〒014-0368 秋田県仙北市角館町角館駅 中菅沢１４",
+      "google_place_id": "ChIJY8XvokSaj18RdJGtjt2CtcI",
+      "latitude": 39.5916988,
+      "longitude": 140.5710513,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "JP-CH-002",
+      "query": "Morioka Station",
+      "coordinate_scope": "regional_reference_hub",
+      "expected_title_tokens": [
+        "盛岡駅"
+      ],
+      "expected_address_region": "岩手県",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Morioka+Station&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Morioka+Station&query_place_id=ChIJtRo3qTN2hV8RlXz_r2eECeI",
+      "google_title": "盛岡駅",
+      "google_address": "日本、〒020-0034 岩手県盛岡市盛岡駅前通１−４８ 盛岡駅",
+      "google_place_id": "ChIJtRo3qTN2hV8RlXz_r2eECeI",
+      "latitude": 39.7014371,
+      "longitude": 141.136723,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "JP-CH-003",
+      "query": "Asahara Shrine Ojiya Niigata",
+      "coordinate_scope": "representative_event_venue",
+      "expected_title_tokens": [
+        "浅原神社"
+      ],
+      "expected_address_region": "新潟県",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Asahara+Shrine+Ojiya+Niigata&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Asahara+Shrine+Ojiya+Niigata&query_place_id=ChIJtcx-e06l9V8RaFoNRhKIJvs",
+      "google_title": "浅原神社",
+      "google_address": "日本、〒947-0101 新潟県小千谷市片貝町６５４８ 浅原神社",
+      "google_place_id": "ChIJtcx-e06l9V8RaFoNRhKIJvs",
+      "latitude": 37.369672,
+      "longitude": 138.774505,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "JP-CH-004",
+      "query": "御蔵島港船客待合所",
+      "coordinate_scope": "departure_port",
+      "expected_title_tokens": [
+        "御蔵島港船客待合所",
+        "御蔵島港"
+      ],
+      "expected_address_region": "東京都",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=%E5%BE%A1%E8%94%B5%E5%B3%B6%E6%B8%AF%E8%88%B9%E5%AE%A2%E5%BE%85%E5%90%88%E6%89%80&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=%E5%BE%A1%E8%94%B5%E5%B3%B6%E6%B8%AF%E8%88%B9%E5%AE%A2%E5%BE%85%E5%90%88%E6%89%80&query_place_id=ChIJgaXZu-tzFmARFlpt8CvzDVs",
+      "google_title": "御蔵島港船客待合所",
+      "google_address": "日本、〒100-1301 東京都御蔵島村御蔵島港船客待合所",
+      "google_place_id": "ChIJgaXZu-tzFmARFlpt8CvzDVs",
+      "latitude": 33.8956871,
+      "longitude": 139.5893227,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "JP-NM-001",
+      "query": "Tateyama Kurobe Alpine Route Murodo Terminal",
+      "coordinate_scope": "regional_reference_hub",
+      "expected_title_tokens": [
+        "室堂ターミナル"
+      ],
+      "expected_address_region": "富山県",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Tateyama+Kurobe+Alpine+Route+Murodo+Terminal&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Tateyama+Kurobe+Alpine+Route+Murodo+Terminal&query_place_id=ChIJD9-IUhbn918RnvSGH8nIBI8",
+      "google_title": "室堂ターミナル",
+      "google_address": "日本、〒930-1406 富山県中新川郡立山町芦峅寺室堂ターミナル",
+      "google_place_id": "ChIJD9-IUhbn918RnvSGH8nIBI8",
+      "latitude": 36.5770616,
+      "longitude": 137.5958087,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "JP-NM-002",
+      "query": "Euglena Mall Ishigaki",
+      "coordinate_scope": "regional_reference_hub",
+      "expected_title_tokens": [
+        "ユーグレナモール"
+      ],
+      "expected_address_region": "沖縄県",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Euglena+Mall+Ishigaki&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Euglena+Mall+Ishigaki&query_place_id=ChIJkQwhw60KYDQRAnMh4v-3FvM",
+      "google_title": "ユーグレナモール",
+      "google_address": "日本、〒907-0022 沖縄県石垣市大川２０３ ユーグレナモール",
+      "google_place_id": "ChIJkQwhw60KYDQRAnMh4v-3FvM",
+      "latitude": 24.3397121,
+      "longitude": 124.1582806,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "JP-NM-003",
+      "query": "Hakozaki Shrine Fukuoka",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "筥崎宮"
+      ],
+      "expected_address_region": "福岡県",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Hakozaki+Shrine+Fukuoka&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Hakozaki+Shrine+Fukuoka&query_place_id=ChIJ_yUbsy-OQTURaoznGZjnjbw",
+      "google_title": "筑前國一之宮 筥崎宮",
+      "google_address": "日本、〒812-0053 福岡県福岡市東区箱崎１丁目２２−１ 筑前國一之宮 筥崎宮",
+      "google_place_id": "ChIJ_yUbsy-OQTURaoznGZjnjbw",
+      "latitude": 33.6149865,
+      "longitude": 130.4228677,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "JP-NM-004",
+      "query": "Ryogoku Kokugikan",
+      "coordinate_scope": "representative_event_venue",
+      "expected_title_tokens": [
+        "両国国技館"
+      ],
+      "expected_address_region": "東京都",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Ryogoku+Kokugikan&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Ryogoku+Kokugikan&query_place_id=ChIJGeu4VDWJGGARdPoda8d8I3A",
+      "google_title": "両国国技館",
+      "google_address": "日本、〒130-0015 東京都墨田区横網１丁目３−２８ 両国国技館",
+      "google_place_id": "ChIJGeu4VDWJGGARdPoda8d8I3A",
+      "latitude": 35.69700479999999,
+      "longitude": 139.7935122,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "JP-NM-005",
+      "query": "Obuse Station Nagano",
+      "coordinate_scope": "regional_reference_hub",
+      "expected_title_tokens": [
+        "小布施駅"
+      ],
+      "expected_address_region": "長野県",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Obuse+Station+Nagano&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Obuse+Station+Nagano&query_place_id=ChIJH-A3aGeJHWARl-6GuLdHBmw",
+      "google_title": "小布施駅",
+      "google_address": "日本、〒381-0201 長野県上高井郡小布施町小布施小布施駅",
+      "google_place_id": "ChIJH-A3aGeJHWARl-6GuLdHBmw",
+      "latitude": 36.6989409,
+      "longitude": 138.3128615,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "JP-NM-006",
+      "query": "Tsurugaoka Hachimangu",
+      "coordinate_scope": "place",
+      "expected_title_tokens": [
+        "鶴岡八幡宮"
+      ],
+      "expected_address_region": "神奈川県",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Tsurugaoka+Hachimangu&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Tsurugaoka+Hachimangu&query_place_id=ChIJiaqQeLhFGGARtTZQEBCtZ6g",
+      "google_title": "鶴岡八幡宮",
+      "google_address": "日本、〒248-8588 神奈川県鎌倉市雪ノ下２丁目１−３１ 鶴岡八幡宮",
+      "google_place_id": "ChIJiaqQeLhFGGARtTZQEBCtZ6g",
+      "latitude": 35.3259856,
+      "longitude": 139.5563462,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "JP-NM-007",
+      "query": "岸和田だんじり会館",
+      "coordinate_scope": "regional_reference_hub",
+      "expected_title_tokens": [
+        "岸和田だんじり会館"
+      ],
+      "expected_address_region": "大阪府",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=%E5%B2%B8%E5%92%8C%E7%94%B0%E3%81%A0%E3%82%93%E3%81%98%E3%82%8A%E4%BC%9A%E9%A4%A8&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=%E5%B2%B8%E5%92%8C%E7%94%B0%E3%81%A0%E3%82%93%E3%81%98%E3%82%8A%E4%BC%9A%E9%A4%A8&query_place_id=ChIJ8UkEOwzGAGARo4MASnxj16c",
+      "google_title": "岸和田だんじり会館",
+      "google_address": "日本、〒596-0074 大阪府岸和田市本町１１−２３ 岸和田だんじり会館",
+      "google_place_id": "ChIJ8UkEOwzGAGARo4MASnxj16c",
+      "latitude": 34.4590248,
+      "longitude": 135.368221,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    },
+    {
+      "candidate_id": "JP-NM-008",
+      "query": "Etchu Yatsuo Station",
+      "coordinate_scope": "regional_reference_hub",
+      "expected_title_tokens": [
+        "越中八尾駅"
+      ],
+      "expected_address_region": "富山県",
+      "status": "verified",
+      "lookup_url": "https://www.google.com/maps?q=Etchu+Yatsuo+Station&output=embed&hl=ja",
+      "google_maps_url": "https://www.google.com/maps/search/?api=1&query=Etchu+Yatsuo+Station&query_place_id=ChIJyW2OotyL918RPVVYzn9nT-I",
+      "google_title": "越中八尾駅",
+      "google_address": "日本、〒939-2376 富山県富山市八尾町福島越中八尾駅",
+      "google_place_id": "ChIJyW2OotyL918RPVVYzn9nT-I",
+      "latitude": 36.5917889,
+      "longitude": 137.1382347,
+      "checks": {
+        "title_matches_expected_entity": true,
+        "address_matches_expected_region": true,
+        "within_japan_bounds": true,
+        "place_id_present": true
+      }
+    }
+  ],
+  "updated_at": "2026-08-10T16:55:02+08:00"
+}

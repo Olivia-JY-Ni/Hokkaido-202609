@@ -15,6 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 MASTER_PATH = ROOT / "data" / "hokkaido_places_master.json"
 BATCH_PATH = ROOT / "data" / "research_batches_level1.json"
 LOCATION_PATH = ROOT / "data" / "candidate_locations.json"
+LOCATION_REVIEW_PATH = ROOT / "data" / "google_maps_coordinate_review_current.json"
+LEGACY_MASTER_PATH = ROOT / "data" / "history" / "places_master_legacy_42.json"
 ROUTES_PATH = ROOT / "data" / "routes.json"
 
 EXPECTED_TOTAL = 77
@@ -22,7 +24,7 @@ EXPECTED_ELIGIBLE = 73
 EXPECTED_AGGREGATES = 4
 EXPECTED_CHALLENGERS = 12
 EXPECTED_BATCHES = 10
-EXPECTED_VERIFIED_LEGACY_COORDINATES = 42
+EXPECTED_VERIFIED_COORDINATES = 77
 EXPECTED_AGGREGATE_IDS = {"RM-SAP", "RM-ASH", "RM-SHR", "RM-KUS"}
 DISTINCT_KUSHIRO_PAIR = {"R2-KUS-004", "R2-KUS-005"}
 LEGAL_CATEGORIES = {
@@ -54,6 +56,8 @@ def validate(external_master: Path | None = None) -> list[str]:
     master = load_json(MASTER_PATH)
     batches = load_json(BATCH_PATH)
     locations = load_json(LOCATION_PATH)
+    location_review = load_json(LOCATION_REVIEW_PATH)
+    legacy_master = load_json(LEGACY_MASTER_PATH)
     routes = load_json(ROUTES_PATH)
     candidates = master.get("candidates", [])
 
@@ -168,10 +172,32 @@ def validate(external_master: Path | None = None) -> list[str]:
                 errors.append(f"{cid}: unresolved coordinate must stay null")
         else:
             errors.append(f"{cid}: illegal verification_status {status!r}")
-    if verified_count != EXPECTED_VERIFIED_LEGACY_COORDINATES:
+    if verified_count != EXPECTED_VERIFIED_COORDINATES:
         errors.append(
-            f"verified legacy coordinates: expected {EXPECTED_VERIFIED_LEGACY_COORDINATES}, got {verified_count}"
+            f"verified coordinates: expected {EXPECTED_VERIFIED_COORDINATES}, got {verified_count}"
         )
+
+    review_rows = location_review.get("results", [])
+    legacy_ids = {row["unique_id"] for row in legacy_master.get("records", [])}
+    expected_review_ids = id_set - legacy_ids
+    review_by_id = {row.get("candidate_id"): row for row in review_rows}
+    if len(review_rows) != 35 or set(review_by_id) != expected_review_ids:
+        errors.append("current Google Maps review must cover exactly the 35 post-legacy Candidates")
+    overlay_by_id = {row["candidate_id"]: row for row in location_rows}
+    for cid, evidence in review_by_id.items():
+        if evidence.get("status") != "verified" or not all(evidence.get("checks", {}).values()):
+            errors.append(f"{cid}: Google Maps title/region/bounds/Place ID checks are not all verified")
+            continue
+        location = overlay_by_id.get(cid, {})
+        comparisons = {
+            "lat": evidence.get("latitude"), "lon": evidence.get("longitude"),
+            "scope": evidence.get("coordinate_scope"),
+            "provider_place_id": evidence.get("google_place_id"),
+            "source_url": evidence.get("google_maps_url"),
+        }
+        for key, value in comparisons.items():
+            if location.get(key) != value:
+                errors.append(f"{cid}: location overlay {key} differs from current Google Maps evidence")
 
     for day in routes.get("trip", {}).get("days", []):
         route_refs = list(day.get("place_sequence", []))

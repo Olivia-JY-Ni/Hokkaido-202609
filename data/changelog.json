@@ -328,6 +328,52 @@
         "level_1_batches": 10,
         "merge_policy": "exact candidate_id; preview first; append-only overlays; preserve provenance, evidence, and conflicts"
       }
+    },
+    {
+      "change_id": "google-maps-new-candidate-coordinates-2026-08-10T16:55:30+08:00",
+      "timestamp": "2026-08-10T16:55:30+08:00",
+      "change_type": "coordinate_verification",
+      "provider": "Google Maps",
+      "records_updated": 35,
+      "candidate_ids": [
+        "R2-SAP-001",
+        "R2-SAP-002",
+        "R2-SAP-003",
+        "R2-ASH-001",
+        "R2-ASH-002",
+        "R2-ASH-003",
+        "R2-ASH-004",
+        "R2-SHR-001",
+        "R2-SHR-002",
+        "R2-SHR-003",
+        "R2-KUS-001",
+        "R2-KUS-002",
+        "R2-KUS-003",
+        "R2-KUS-004",
+        "R2-KUS-005",
+        "R2-ABA-001",
+        "R2-ABA-002",
+        "R2-FUR-001",
+        "R2-TKA-001",
+        "RM-SAP",
+        "RM-ASH",
+        "RM-SHR",
+        "RM-KUS",
+        "JP-CH-001",
+        "JP-CH-002",
+        "JP-CH-003",
+        "JP-CH-004",
+        "JP-NM-001",
+        "JP-NM-002",
+        "JP-NM-003",
+        "JP-NM-004",
+        "JP-NM-005",
+        "JP-NM-006",
+        "JP-NM-007",
+        "JP-NM-008"
+      ],
+      "evidence": "data/google_maps_coordinate_review_current.json",
+      "policy": "Exact entity/prefecture/Place ID verification; representative scopes documented for non-point Candidates."
     }
   ]
 }

@@ -8,3 +8,4 @@ Current entry points:
 - `scripts/test_project.py`
 - `scripts/level1_delta.py`
 - `scripts/build_candidate_locations.py`
+- `scripts/geocode_candidate_locations_google.py`
