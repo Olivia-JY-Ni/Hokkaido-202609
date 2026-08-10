@@ -1,0 +1,471 @@
+{
+  "schema_version": "1.0.0",
+  "generated_from": [
+    "data/hokkaido_places_master.json",
+    "data/candidate_locations.json"
+  ],
+  "policy": "City/area entities are a UI grouping overlay, not Candidates. Browser-side manual assignment overrides never rewrite the research canonical.",
+  "summary": {
+    "region_total": 26,
+    "assigned_candidate_total": 77,
+    "unassigned_candidate_total": 0
+  },
+  "regions": [
+    {
+      "region_id": "hokkaido-tokachi",
+      "name_zh": "十胜 / 带广 / 佐幌",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "HKD-TKA-001",
+        "HKD-TKA-002",
+        "HKD-TKA-003",
+        "HKD-TKA-004",
+        "HKD-TKA-005",
+        "HKD-SAH-001",
+        "R2-TKA-001"
+      ],
+      "center_lat": 42.9644967,
+      "center_lon": 143.1511099,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "佐幌",
+        "十胜",
+        "十胜/带广",
+        "十胜川",
+        "带广"
+      ]
+    },
+    {
+      "region_id": "hokkaido-chitose",
+      "name_zh": "千岁",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "HKD-CTS-001"
+      ],
+      "center_lat": 42.8327899,
+      "center_lon": 141.6591892,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "千岁"
+      ]
+    },
+    {
+      "region_id": "hokkaido-furano-biei",
+      "name_zh": "富良野 / 美瑛",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "HKD-FUR-001",
+        "HKD-FUR-002",
+        "R2-FUR-001"
+      ],
+      "center_lat": 43.4313276,
+      "center_lon": 142.4276289,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "中富良野",
+        "美瑛",
+        "美瑛/富良野"
+      ]
+    },
+    {
+      "region_id": "hokkaido-otaru",
+      "name_zh": "小樽",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "HKD-OTA-001",
+        "HKD-OTA-002"
+      ],
+      "center_lat": 43.1869068,
+      "center_lon": 140.987821,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "小樽"
+      ]
+    },
+    {
+      "region_id": "hokkaido-asahikawa-daisetsuzan",
+      "name_zh": "旭川 / 大雪山",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "HKD-DAI-001",
+        "HKD-DAI-002",
+        "HKD-ASH-001",
+        "HKD-ASH-002",
+        "R2-ASH-001",
+        "R2-ASH-002",
+        "R2-ASH-003",
+        "R2-ASH-004",
+        "RM-ASH"
+      ],
+      "center_lat": 43.746308,
+      "center_lon": 142.4967105,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "大雪山",
+        "旭川",
+        "旭川 / 大雪山"
+      ]
+    },
+    {
+      "region_id": "hokkaido-sapporo",
+      "name_zh": "札幌 / 定山溪",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "HKD-SAP-001",
+        "HKD-SAP-002",
+        "HKD-SAP-003",
+        "HKD-SAP-004",
+        "HKD-SAP-005",
+        "R2-SAP-001",
+        "R2-SAP-002",
+        "R2-SAP-003",
+        "RM-SAP"
+      ],
+      "center_lat": 43.0670059,
+      "center_lon": 141.3459337,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "札幌",
+        "札幌周边"
+      ]
+    },
+    {
+      "region_id": "hokkaido-toyako",
+      "name_zh": "洞爷湖",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "HKD-TOY-001",
+        "HKD-TOY-002",
+        "HKD-TOY-003"
+      ],
+      "center_lat": 42.5659171,
+      "center_lon": 140.8230733,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "洞爷湖"
+      ]
+    },
+    {
+      "region_id": "hokkaido-noboribetsu",
+      "name_zh": "登别",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "HKD-NOB-001",
+        "HKD-NOB-002",
+        "HKD-NOB-003"
+      ],
+      "center_lat": 42.4955025,
+      "center_lon": 141.1449602,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "登别"
+      ]
+    },
+    {
+      "region_id": "hokkaido-shiretoko-utoro",
+      "name_zh": "知床 / 宇登吕",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "HKD-SHR-001",
+        "HKD-SHR-002",
+        "HKD-SHR-003",
+        "HKD-SHR-004",
+        "R2-SHR-001",
+        "R2-SHR-002",
+        "RM-SHR"
+      ],
+      "center_lat": 44.0894524,
+      "center_lon": 145.0251635,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "宇登吕",
+        "知床",
+        "知床・ウトロ"
+      ]
+    },
+    {
+      "region_id": "hokkaido-abashiri",
+      "name_zh": "网走 / 能取湖",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "HKD-ABA-001",
+        "HKD-ABA-002",
+        "R2-ABA-001",
+        "R2-ABA-002"
+      ],
+      "center_lat": 44.006245,
+      "center_lon": 144.1781789,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "网走"
+      ]
+    },
+    {
+      "region_id": "hokkaido-rausu",
+      "name_zh": "罗臼",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "HKD-RUS-001",
+        "R2-SHR-003"
+      ],
+      "center_lat": 44.0190571,
+      "center_lon": 145.19609,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "罗臼",
+        "羅臼"
+      ]
+    },
+    {
+      "region_id": "hokkaido-engaru",
+      "name_zh": "远轻",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "HKD-ENG-001"
+      ],
+      "center_lat": 44.0587383,
+      "center_lon": 143.5095208,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "远轻"
+      ]
+    },
+    {
+      "region_id": "hokkaido-kushiro-east",
+      "name_zh": "钏路 / 道东",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "HKD-SHR-005",
+        "HKD-KUS-001",
+        "HKD-KUS-002",
+        "HKD-KUS-003",
+        "HKD-KUS-004",
+        "R2-KUS-001",
+        "R2-KUS-002",
+        "R2-KUS-003",
+        "R2-KUS-004",
+        "R2-KUS-005",
+        "RM-KUS"
+      ],
+      "center_lat": 43.003261,
+      "center_lon": 144.3757603,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "道东",
+        "钏路",
+        "钏路 / 道东"
+      ]
+    },
+    {
+      "region_id": "hokkaido-akan-mashu",
+      "name_zh": "阿寒 / 摩周",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "HKD-AKA-001",
+        "HKD-AKA-002",
+        "HKD-AKA-003"
+      ],
+      "center_lat": 43.286479,
+      "center_lon": 144.1907153,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "阿寒/摩周",
+        "阿寒湖"
+      ]
+    },
+    {
+      "region_id": "japan-tokyo-ryogoku",
+      "name_zh": "东京 / 两国",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "JP-NM-004"
+      ],
+      "center_lat": 35.6970048,
+      "center_lon": 139.7935122,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "东京・两国"
+      ]
+    },
+    {
+      "region_id": "japan-kishiwada",
+      "name_zh": "大阪 / 岸和田",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "JP-NM-007"
+      ],
+      "center_lat": 34.4590248,
+      "center_lon": 135.368221,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "大阪・岸和田"
+      ]
+    },
+    {
+      "region_id": "japan-toyama-yatsuo",
+      "name_zh": "富山 / 八尾",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "JP-NM-008"
+      ],
+      "center_lat": 36.5917889,
+      "center_lon": 137.1382347,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "富山八尾"
+      ]
+    },
+    {
+      "region_id": "japan-morioka-hanamaki",
+      "name_zh": "岩手 / 花卷 / 盛冈",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "JP-CH-002"
+      ],
+      "center_lat": 39.7014371,
+      "center_lon": 141.136723,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "岩手・花卷—盛冈"
+      ]
+    },
+    {
+      "region_id": "japan-mikurajima",
+      "name_zh": "御藏岛",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "JP-CH-004"
+      ],
+      "center_lat": 33.8956871,
+      "center_lon": 139.5893227,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "御藏岛"
+      ]
+    },
+    {
+      "region_id": "japan-katakai",
+      "name_zh": "新潟 / 片贝",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "JP-CH-003"
+      ],
+      "center_lat": 37.369672,
+      "center_lon": 138.774505,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "新潟・片贝"
+      ]
+    },
+    {
+      "region_id": "japan-ishigaki",
+      "name_zh": "石垣岛",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "JP-NM-002"
+      ],
+      "center_lat": 24.3397121,
+      "center_lon": 124.1582806,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "石垣岛"
+      ]
+    },
+    {
+      "region_id": "japan-fukuoka-hakozaki",
+      "name_zh": "福冈 / 筥崎宫",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "JP-NM-003"
+      ],
+      "center_lat": 33.6149865,
+      "center_lon": 130.4228677,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "福冈・筥崎宫"
+      ]
+    },
+    {
+      "region_id": "japan-kakunodate",
+      "name_zh": "秋田 / 角馆",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "JP-CH-001"
+      ],
+      "center_lat": 39.5916988,
+      "center_lon": 140.5710513,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "秋田・角馆"
+      ]
+    },
+    {
+      "region_id": "japan-murodo-toyama",
+      "name_zh": "立山黑部 / 室堂 / 富山",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "JP-NM-001"
+      ],
+      "center_lat": 36.5770616,
+      "center_lon": 137.5958087,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "立山黑部・室堂 + 富山"
+      ]
+    },
+    {
+      "region_id": "japan-kamakura",
+      "name_zh": "镰仓 / 鹤冈八幡宫",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "JP-NM-006"
+      ],
+      "center_lat": 35.3259856,
+      "center_lon": 139.5563462,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "镰仓・鹤冈八幡宫"
+      ]
+    },
+    {
+      "region_id": "japan-obuse",
+      "name_zh": "长野 / 小布施",
+      "country": "Japan",
+      "entity_type": "city_or_area",
+      "candidate_ids": [
+        "JP-NM-005"
+      ],
+      "center_lat": 36.6989409,
+      "center_lon": 138.3128615,
+      "coordinate_method": "centroid_of_verified_candidate_points",
+      "source_region_labels": [
+        "长野・小布施"
+      ]
+    }
+  ]
+}

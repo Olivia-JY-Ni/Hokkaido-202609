@@ -17,6 +17,7 @@ BATCH_PATH = ROOT / "data" / "research_batches_level1.json"
 LOCATION_PATH = ROOT / "data" / "candidate_locations.json"
 LOCATION_REVIEW_PATH = ROOT / "data" / "google_maps_coordinate_review_current.json"
 LEGACY_MASTER_PATH = ROOT / "data" / "history" / "places_master_legacy_42.json"
+REGIONS_PATH = ROOT / "data" / "candidate_regions.json"
 ROUTES_PATH = ROOT / "data" / "routes.json"
 
 EXPECTED_TOTAL = 77
@@ -58,6 +59,7 @@ def validate(external_master: Path | None = None) -> list[str]:
     locations = load_json(LOCATION_PATH)
     location_review = load_json(LOCATION_REVIEW_PATH)
     legacy_master = load_json(LEGACY_MASTER_PATH)
+    regions = load_json(REGIONS_PATH)
     routes = load_json(ROUTES_PATH)
     candidates = master.get("candidates", [])
 
@@ -198,6 +200,30 @@ def validate(external_master: Path | None = None) -> list[str]:
         for key, value in comparisons.items():
             if location.get(key) != value:
                 errors.append(f"{cid}: location overlay {key} differs from current Google Maps evidence")
+
+    region_rows = regions.get("regions", [])
+    region_ids = [row.get("region_id") for row in region_rows]
+    if len(region_rows) != 26 or len(set(region_ids)) != len(region_ids) or None in region_ids:
+        errors.append("city/area overlay must contain 26 unique region_id values")
+    region_assignments = [cid for row in region_rows for cid in row.get("candidate_ids", [])]
+    assignment_duplicates = sorted(cid for cid, count in Counter(region_assignments).items() if count > 1)
+    assignment_missing = sorted(id_set - set(region_assignments))
+    assignment_unknown = sorted(set(region_assignments) - id_set)
+    if assignment_duplicates or assignment_missing or assignment_unknown:
+        errors.append(
+            f"default city/area assignments must cover every Candidate exactly once; "
+            f"duplicates={assignment_duplicates}, missing={assignment_missing}, unknown={assignment_unknown}"
+        )
+    for row in region_rows:
+        rid = row.get("region_id", "<missing>")
+        if row.get("entity_type") != "city_or_area":
+            errors.append(f"{rid}: region entity_type must be city_or_area")
+        if not row.get("name_zh") or not row.get("candidate_ids"):
+            errors.append(f"{rid}: region must have a name and at least one default Candidate")
+        if not isinstance(row.get("center_lat"), (int, float)) or not -90 <= row["center_lat"] <= 90:
+            errors.append(f"{rid}: invalid derived center latitude")
+        if not isinstance(row.get("center_lon"), (int, float)) or not -180 <= row["center_lon"] <= 180:
+            errors.append(f"{rid}: invalid derived center longitude")
 
     for day in routes.get("trip", {}).get("days", []):
         route_refs = list(day.get("place_sequence", []))

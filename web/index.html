@@ -17,13 +17,14 @@
     </div>
     <div class="summary" aria-live="polite">
       <strong id="visibleCount">—</strong><span>当前候选</span>
-      <strong id="markerCount">—</strong><span>已核验坐标</span>
+      <strong id="markerCount">—</strong><span>地图标记</span>
+      <strong id="itineraryCount">—</strong><span>⭐ 行程区域</span>
     </div>
   </header>
 
   <nav class="view-tabs" aria-label="地图图层">
-    <button class="tab active" data-view="all">全部 Candidates</button>
-    <button class="tab" data-view="regions">按地区查看</button>
+    <button class="tab" data-view="all">全部 Candidates</button>
+    <button class="tab active" data-view="regions">按地区查看</button>
     <span id="routeTabs"></span>
   </nav>
 
@@ -51,7 +52,7 @@
         <legend>类别快捷筛选</legend>
         <div id="typeChips" class="chips"></div>
       </fieldset>
-      <p class="filter-note">这里不做排名。旧评分仅作为历史研究判断保留；未知值显示为“未研究 / unknown / L1 pending”。</p>
+      <p class="filter-note">“按地区查看”是默认入口。Candidate 的人工归属与行程选择只保存在当前浏览器，不改写研究主数据。</p>
     </aside>
 
     <section class="map-stage" aria-label="地图">

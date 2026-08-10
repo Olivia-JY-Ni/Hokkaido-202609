@@ -16,3 +16,5 @@
 14. Historical scores may be shown only as historical context. Do not add ranking, itinerary selection, or route optimization in Phase A.
 15. Routes and future itinerary references must use stable `candidate_id` values.
 16. Run `python scripts/validate_data.py` and `python scripts/test_project.py` after structural changes.
+17. Treat `data/candidate_regions.json` as a derived front-end overlay, not a research canonical. Default Candidate membership must use exact `candidate_id` values and cover all 77 Candidates exactly once.
+18. Keep `按地区查看` as the single region-planning entry point and `全部 Candidates` as a complete 77-Candidate list. Browser-local reassignment or itinerary state must not mutate repository data.

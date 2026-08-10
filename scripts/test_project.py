@@ -126,12 +126,25 @@ def main() -> int:
 
     app_text = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
     adapter_text = (ROOT / "web" / "data-adapter.js").read_text(encoding="utf-8")
+    index_text = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
     if "hokkaido_places_master.json" not in app_text:
         failures.append("web app does not consume the current canonical filename")
     if "places_master.json" in app_text.replace("hokkaido_places_master.json", ""):
         failures.append("web app still references the legacy canonical filename")
     if "buildCandidateViewModels" not in adapter_text:
         failures.append("nested-schema adapter is missing")
+    if "candidate_regions.json" not in app_text or 'view: "regions"' not in app_text:
+        failures.append("existing region view is not the default Candidate grouping entry")
+    if "data-toggle-region" not in app_text or "region-map-marker" not in app_text:
+        failures.append("region itinerary star interaction is missing")
+    if "data-assign-to-region" not in app_text or "assignmentOverrides" not in app_text:
+        failures.append("manual and batch Candidate-to-region assignment is missing")
+    if "itinerary-builder" in index_text or "areaPreset" in index_text:
+        failures.append("a separate region feature was added instead of modifying the existing region view")
+    if 'data-view="regions"' not in index_text or 'data-view="all"' not in index_text:
+        failures.append("region and all-Candidate views are not both available")
+    if "filter(item => !regionIdForCandidate(item.id))" in app_text:
+        failures.append("all-Candidate view still hides Candidates assigned to a region")
     if (ROOT / "data" / "places_master.json").exists():
         failures.append("legacy places_master.json remains as a competing current canonical")
     if not (ROOT / "data" / "history" / "places_master_legacy_42.json").exists():
