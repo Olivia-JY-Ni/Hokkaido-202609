@@ -6,7 +6,9 @@ const state = {
   candidateQuery: "", candidateCategory: "", candidateUnassignedOnly: false,
   searchPreview: null, pickerAreaId: null, pickerSelection: new Set(), draggedAreaId: null,
   livePredictions: [], placesReady: false, searchSessionToken: null, searchRequestId: 0,
-  legendOpen: false,
+  legendOpen: false, nearbyAreaId: null, nearbyType: "tourist_attraction", nearbyPlaces: [],
+  nearbyStatus: "idle", selectedNearbyPlaceId: null, placeDetails: new Map(), placeDetailsLoading: new Set(),
+  routeLegs: [], routeStatus: "idle", routeSignature: "", routeRequestId: 0,
 };
 const $ = id => document.getElementById(id);
 const CATEGORY_LABELS = {
@@ -20,6 +22,10 @@ const COLORS = {
   food_market_drink: "#cf6647", dessert_cafe_bakery: "#cf7893", lodging_onsen: "#8c65a0",
   architecture_museum_shop_workshop: "#687d86", special_transport: "#33849b",
   regional_challenger_module: "#8a7151",
+};
+const NEARBY_TYPES = {
+  tourist_attraction: "景点", restaurant: "餐厅", cafe: "咖啡甜品", park: "公园",
+  museum: "博物馆", spa: "温泉 / Spa", lodging: "住宿", transit_station: "车站", parking: "停车场",
 };
 const unknown = value => window.ResearchDataAdapter.unknown(value);
 
@@ -38,6 +44,27 @@ function friendlyTiming(value) {
   return ({ uncertain: "日期仍待确认", peak_window: "正值最佳时间", outside_best_window: "不在最佳时间", first_half: "行程前半段", second_half: "行程后半段", middle: "行程中段" })[value] || (value === "unknown" ? null : value);
 }
 function labelCategory(value) { return CATEGORY_LABELS[value] || value || "unknown"; }
+function labelBusinessStatus(value) {
+  return ({ OPERATIONAL: "正常营业", CLOSED_TEMPORARILY: "暂时关闭", CLOSED_PERMANENTLY: "永久关闭", FUTURE_OPENING: "即将开业" })[value] || "";
+}
+function compactDistance(meters) { return meters >= 1000 ? `${Math.round(meters / 1000)} 公里` : `${Math.round(meters || 0)} 米`; }
+function compactDuration(milliseconds) {
+  const minutes = Math.max(1, Math.round((milliseconds || 0) / 60000));
+  const hours = Math.floor(minutes / 60); const rest = minutes % 60;
+  return hours ? `${hours} 小时${rest ? ` ${rest} 分` : ""}` : `${rest} 分钟`;
+}
+function viewportJSON(viewport) {
+  if (!viewport) return null;
+  const value = typeof viewport.toJSON === "function" ? viewport.toJSON() : viewport;
+  return [value?.north,value?.south,value?.east,value?.west].every(Number.isFinite) ? {
+    north: value.north, south: value.south, east: value.east, west: value.west,
+  } : null;
+}
+function simplifyAddressComponents(components) {
+  return (components || []).map(component => ({
+    longText: component.longText || "", shortText: component.shortText || "", types: component.types || [],
+  }));
+}
 function validCoordinates(item) {
   const { lat, lon, verification_status: status } = item.location || {};
   return status === "verified" && Number.isFinite(lat) && Number.isFinite(lon);
@@ -46,6 +73,7 @@ function areaById(id) { return state.areas.find(area => area.id === id); }
 function candidateById(id) { return state.candidates.find(candidate => candidate.id === id); }
 function areaForCandidate(id) { return state.areas.find(area => area.candidateIds.includes(id)) || null; }
 function candidatesForArea(id) { const area = areaById(id); return area ? area.candidateIds.map(candidateById).filter(Boolean) : []; }
+function routeLegTo(areaId) { return state.routeLegs.find(leg => leg.toId === areaId) || null; }
 function searchCandidateText(item) {
   return [item.id, item.name, item.names?.ja, item.names?.en, item.region, item.municipality, item.experience?.experience_summary]
     .filter(Boolean).join(" ").toLowerCase();
@@ -57,6 +85,8 @@ function loadUserState() {
       id: area.id, placeId: area.placeId || area.id, name: area.name || "未命名地区", address: area.address || "",
       lat: area.lat, lon: area.lon, startDate: area.startDate || "", endDate: area.endDate || "",
       nights: area.nights || "", note: area.note || "", candidateIds: Array.isArray(area.candidateIds) ? [...new Set(area.candidateIds)] : [],
+      viewport: viewportJSON(area.viewport), primaryType: area.primaryType || "", types: Array.isArray(area.types) ? area.types : [],
+      businessStatus: area.businessStatus || "", addressComponents: Array.isArray(area.addressComponents) ? area.addressComponents : [],
     })) : [];
     state.selectedAreaId = state.areas.some(area => area.id === saved.selectedAreaId) ? saved.selectedAreaId : null;
   } catch (_) { state.areas = []; state.selectedAreaId = null; }
@@ -70,7 +100,7 @@ function fillCategorySelect(select) {
   });
 }
 
-let map, mapProvider = "leaflet", areaLayer, candidateLayer, routeLayer, previewLayer, searchTimer;
+let map, mapProvider = "leaflet", areaLayer, candidateLayer, routeLayer, previewLayer, nearbyLayer, searchTimer;
 const areaMarkers = new Map();
 const candidateMarkers = new Map();
 function initLeafletMap() {
@@ -81,7 +111,7 @@ function initLeafletMap() {
     maxZoom: 18, attribution: "© OpenStreetMap",
   }).addTo(map);
   routeLayer = L.layerGroup().addTo(map); areaLayer = L.layerGroup().addTo(map);
-  candidateLayer = L.layerGroup().addTo(map); previewLayer = L.layerGroup().addTo(map);
+  candidateLayer = L.layerGroup().addTo(map); previewLayer = L.layerGroup().addTo(map); nearbyLayer = L.layerGroup().addTo(map);
 }
 function shortSummary(item) {
   const value = item.experience?.experience_summary || item.experience?.why_people_love_it;
@@ -124,7 +154,7 @@ async function initMap() {
       initLeafletMap();
       return;
     }
-    areaLayer = []; candidateLayer = []; routeLayer = []; previewLayer = [];
+    areaLayer = []; candidateLayer = []; routeLayer = []; previewLayer = []; nearbyLayer = [];
     try {
       await google.maps.importLibrary("places");
       state.placesReady = true;
@@ -171,7 +201,7 @@ function mapCandidates() {
   return state.candidates.filter(validCoordinates);
 }
 function renderMap({ fit = false } = {}) {
-  clearMapLayer(areaLayer); clearMapLayer(candidateLayer); clearMapLayer(routeLayer); clearMapLayer(previewLayer);
+  clearMapLayer(areaLayer); clearMapLayer(candidateLayer); clearMapLayer(routeLayer); clearMapLayer(previewLayer); clearMapLayer(nearbyLayer);
   areaMarkers.clear(); candidateMarkers.clear();
   const selected = areaById(state.selectedAreaId);
   const points = [];
@@ -194,11 +224,13 @@ function renderMap({ fit = false } = {}) {
       if (!selected || isSelected) points.push({ lat: area.lat, lng: area.lon });
     });
     if (!selected && state.areas.length > 1) {
+      const computedPaths = state.routeLegs.filter(leg => leg.path?.length > 1);
       if (mapProvider === "google") {
-        const route = new google.maps.Polyline({ path: state.areas.map(area => ({ lat: area.lat, lng: area.lon })), map, strokeColor: "#346c58", strokeWeight: 3, strokeOpacity: .55 });
-        routeLayer.push(route);
+        if (computedPaths.length) computedPaths.forEach(leg => routeLayer.push(new google.maps.Polyline({ path: leg.path, map, strokeColor: "#1a73e8", strokeWeight: 5, strokeOpacity: .72 })));
+        else routeLayer.push(new google.maps.Polyline({ path: state.areas.map(area => ({ lat: area.lat, lng: area.lon })), map, strokeColor: "#1a73e8", strokeWeight: 3, strokeOpacity: .48 }));
       } else {
-        L.polyline(state.areas.map(area => [area.lat, area.lon]), { color: "#346c58", weight: 3, opacity: .55, dashArray: "7 8" }).addTo(routeLayer);
+        if (computedPaths.length) computedPaths.forEach(leg => L.polyline(leg.path.map(point => [point.lat,point.lng]), { color: "#1a73e8", weight: 5, opacity: .72 }).addTo(routeLayer));
+        else L.polyline(state.areas.map(area => [area.lat, area.lon]), { color: "#1a73e8", weight: 3, opacity: .48, dashArray: "7 8" }).addTo(routeLayer);
       }
     }
   }
@@ -223,12 +255,26 @@ function renderMap({ fit = false } = {}) {
     }
     candidateMarkers.set(item.id, marker); points.push({ lat: item.location.lat, lng: item.location.lon });
   });
+  state.nearbyPlaces.forEach(place => {
+    if (!place.location) return;
+    const position = { lat: place.location.lat(), lng: place.location.lng() };
+    const selectedNearby = place.id === state.selectedNearbyPlaceId;
+    if (mapProvider === "google") {
+      const marker = new google.maps.Marker({ position, map, title: place.displayName || "周边地点", zIndex: selectedNearby ? 1150 : 250,
+        icon: { path: google.maps.SymbolPath.CIRCLE, scale: selectedNearby ? 10 : 6, fillColor: "#1a73e8", fillOpacity: 1, strokeColor: "#fff", strokeWeight: selectedNearby ? 4 : 2 } });
+      marker.addListener("click", () => focusNearbyPlace(place.id)); nearbyLayer.push(marker);
+    } else {
+      const marker = L.circleMarker([position.lat,position.lng], { radius: selectedNearby ? 10 : 6, color: "#fff", weight: selectedNearby ? 4 : 2, fillColor: "#1a73e8", fillOpacity: 1 });
+      marker.on("click", () => focusNearbyPlace(place.id)); marker.addTo(nearbyLayer);
+    }
+  });
   renderLegend(visibleCandidates);
   if (fit) {
     const libraryPoints = visibleCandidates.filter(item => !String(item.id).startsWith("JP-")).map(item => ({ lat: item.location.lat, lng: item.location.lon }));
     const focusPoints = state.view === "candidates" && !selected && libraryPoints.length ? libraryPoints : points;
     if (mapProvider === "google") {
-      if (selected && visibleCandidates.length === 0) { map.setCenter({ lat: selected.lat, lng: selected.lon }); map.setZoom(10); }
+      if (selected && visibleCandidates.length === 0 && selected.viewport) { map.fitBounds(selected.viewport, 72); }
+      else if (selected && visibleCandidates.length === 0) { map.setCenter({ lat: selected.lat, lng: selected.lon }); map.setZoom(10); }
       else if (focusPoints.length === 1) { map.setCenter(focusPoints[0]); map.setZoom(selected ? 11 : 8); }
       else if (focusPoints.length > 1) {
         const bounds = new google.maps.LatLngBounds(); focusPoints.forEach(point => bounds.extend(point)); map.fitBounds(bounds, 72);
@@ -236,7 +282,8 @@ function renderMap({ fit = false } = {}) {
       } else { map.setCenter({ lat: 43.35, lng: 142.15 }); map.setZoom(6); }
     } else {
       const leafletPoints = focusPoints.map(point => [point.lat, point.lng]);
-      if (selected && visibleCandidates.length === 0) map.setView([selected.lat, selected.lon], 10, { animate: true });
+      if (selected && visibleCandidates.length === 0 && selected.viewport) map.fitBounds([[selected.viewport.south,selected.viewport.west],[selected.viewport.north,selected.viewport.east]], { padding: [70,70], animate: true });
+      else if (selected && visibleCandidates.length === 0) map.setView([selected.lat, selected.lon], 10, { animate: true });
       else if (focusPoints.length === 1) map.setView(leafletPoints[0], selected ? 11 : 8, { animate: true });
       else if (focusPoints.length > 1) map.fitBounds(L.latLngBounds(leafletPoints).pad(.18), { maxZoom: selected ? 12 : 9, animate: true });
       else map.setView([43.35, 142.15], 6, { animate: true });
@@ -255,7 +302,8 @@ function renderMapFocusCard() {
   const area = areaById(state.selectedAreaId);
   if (!area) { $("mapFocusCard").hidden = true; return; }
   const previewNames = candidatesForArea(area.id).slice(0, 3).map(item => item.name).join("、");
-  $("mapFocusCard").innerHTML = `<div class="preview-top"><div class="preview-symbol">⭐</div><div class="preview-copy"><p class="preview-meta">当前行程地区</p><h3>${esc(area.name)}</h3><p>${esc(area.address)}</p></div></div>${previewNames ? `<p class="focus-candidate-preview">${esc(previewNames)}${area.candidateIds.length > 3 ? "…" : ""}</p>` : ""}<div class="focus-row"><span>${area.candidateIds.length} 个候选地点 · ${esc(area.startDate || "日期未定")}</span><button data-clear-area-focus>查看整个行程</button></div>`;
+  const status = labelBusinessStatus(area.businessStatus);
+  $("mapFocusCard").innerHTML = `<div class="preview-top"><div class="preview-symbol">⭐</div><div class="preview-copy"><p class="preview-meta">当前行程地区</p><h3>${esc(area.name)}</h3><p>${esc(area.address)}</p>${status ? `<span class="place-status">${esc(status)}</span>` : ""}</div></div>${previewNames ? `<p class="focus-candidate-preview">${esc(previewNames)}${area.candidateIds.length > 3 ? "…" : ""}</p>` : ""}<div class="focus-actions"><button class="primary-button" data-explore-nearby="${esc(area.id)}">探索周边</button><button class="secondary-button" data-refresh-area="${esc(area.id)}">更新地点资料</button></div><div class="focus-row"><span>${area.candidateIds.length} 个候选地点 · ${esc(area.startDate || "日期未定")}</span><button data-clear-area-focus>查看整个行程</button></div>`;
   $("mapFocusCard").hidden = false;
 }
 
@@ -269,12 +317,33 @@ function areaCandidateRows(area) {
   if (!items.length) return '<div class="area-empty-candidates"><strong>还没有候选地点</strong><span>点击下方按钮，从资料库中选择。</span></div>';
   return items.map(item => `<div class="area-candidate-row${item.id === state.selectedCandidateId ? " selected" : ""}"><span class="type-dot" style="background:${COLORS[item.category]}"></span><button data-focus-candidate="${esc(item.id)}"><strong>${esc(item.name)}</strong><span>${esc(labelCategory(item.category))}</span></button><button class="area-detail-button" data-open-candidate-detail="${esc(item.id)}">详情</button><button class="remove-mini" data-remove-candidate="${esc(item.id)}" data-area-id="${esc(area.id)}" aria-label="从地区移除 ${esc(item.name)}">×</button></div>`).join("");
 }
+function renderTripRouteSummary() {
+  const box = $("tripRouteSummary");
+  if (state.areas.length < 2) {
+    box.innerHTML = '<span class="route-icon">↗</span><span><strong>交通时间</strong><small>加入两个地区后自动计算驾车距离</small></span>';
+    return;
+  }
+  if (state.routeStatus === "loading") {
+    box.innerHTML = '<span class="route-spinner"></span><span><strong>正在计算地区间交通</strong><small>按当前行程顺序获取路线</small></span>';
+    return;
+  }
+  const ready = state.routeLegs.filter(leg => Number.isFinite(leg.distanceMeters));
+  if (ready.length) {
+    const totalDistance = ready.reduce((sum,leg) => sum + leg.distanceMeters, 0);
+    const totalDuration = ready.reduce((sum,leg) => sum + leg.durationMillis, 0);
+    box.innerHTML = `<span class="route-icon">🚗</span><span><strong>${esc(compactDuration(totalDuration))} · ${esc(compactDistance(totalDistance))}</strong><small>${ready.length} 段驾车路线${state.routeStatus === "partial" ? " · 部分路线暂不可用" : ""}</small></span><button data-refresh-routes aria-label="重新计算交通">↻</button>`;
+    return;
+  }
+  box.innerHTML = '<span class="route-icon">!</span><span><strong>暂时无法取得交通时间</strong><small>地图仍会按行程顺序连接地区</small></span><button data-refresh-routes>重试</button>';
+}
 function renderAreaCard(area) {
   const selected = area.id === state.selectedAreaId; const expanded = state.expandedAreas.has(area.id);
   const dateLabel = area.startDate ? `${area.startDate}${area.endDate ? ` — ${area.endDate}` : ""}` : "日期未定";
+  const leg = routeLegTo(area.id);
+  const routeMeta = leg && Number.isFinite(leg.distanceMeters) ? `<span class="area-route-meta">从上一站 🚗 ${esc(compactDuration(leg.durationMillis))} · ${esc(compactDistance(leg.distanceMeters))}</span>` : "";
   return `<article class="area-card${selected ? " selected" : ""}" data-area-card="${esc(area.id)}" draggable="true">
-    <div class="area-summary"><button class="drag-handle" aria-label="拖动调整顺序">⋮⋮</button><button class="area-main" data-select-area="${esc(area.id)}"><span class="area-title-row"><span class="area-pin">⭐</span><h3>${esc(area.name)}</h3></span><p>${esc(area.address)}</p><span class="area-inline-meta">${esc(dateLabel)}${area.nights ? ` · ${esc(area.nights)} 晚` : ""} · ${area.candidateIds.length} 个地点</span></button><button class="candidate-toggle" data-toggle-area-candidates="${esc(area.id)}" aria-expanded="${expanded}" aria-label="${expanded ? "收起" : "展开"} ${esc(area.name)} 的候选地点"><span class="chevron">⌄</span></button></div>
-    ${expanded ? `<div class="area-expanded"><div class="area-expanded-heading"><span>候选地点</span><button class="icon-menu-button" data-toggle-area-editor="${esc(area.id)}">编辑地区</button></div><div class="area-candidates">${areaCandidateRows(area)}</div><button class="add-candidates-button" data-open-picker="${esc(area.id)}">＋ 添加候选地点</button></div>` : ""}
+    ${routeMeta}<div class="area-summary"><button class="drag-handle" aria-label="拖动调整顺序">⋮⋮</button><button class="area-main" data-select-area="${esc(area.id)}"><span class="area-title-row"><span class="area-pin">⭐</span><h3>${esc(area.name)}</h3></span><p>${esc(area.address)}</p><span class="area-inline-meta">${esc(dateLabel)}${area.nights ? ` · ${esc(area.nights)} 晚` : ""} · ${area.candidateIds.length} 个地点</span></button><button class="candidate-toggle" data-toggle-area-candidates="${esc(area.id)}" aria-expanded="${expanded}" aria-label="${expanded ? "收起" : "展开"} ${esc(area.name)} 的候选地点"><span class="chevron">⌄</span></button></div>
+    ${expanded ? `<div class="area-expanded"><div class="area-expanded-heading"><span>候选地点</span><button class="icon-menu-button" data-toggle-area-editor="${esc(area.id)}">编辑地区</button></div><div class="area-candidates">${areaCandidateRows(area)}</div><div class="area-primary-actions"><button class="add-candidates-button" data-open-picker="${esc(area.id)}">＋ 添加候选地点</button><button class="explore-nearby-button" data-explore-nearby="${esc(area.id)}">⌖ 探索周边</button></div></div>` : ""}
     ${selected && area.editing ? `<div class="area-editor"><label>地区名称<input data-area-field="name" data-area-id="${esc(area.id)}" value="${esc(area.name)}"></label><label>停留晚数<input type="number" min="0" data-area-field="nights" data-area-id="${esc(area.id)}" value="${esc(area.nights)}"></label><label>开始日期<input type="date" data-area-field="startDate" data-area-id="${esc(area.id)}" value="${esc(area.startDate)}"></label><label>结束日期<input type="date" data-area-field="endDate" data-area-id="${esc(area.id)}" value="${esc(area.endDate)}"></label><label class="wide">备注<textarea data-area-field="note" data-area-id="${esc(area.id)}">${esc(area.note)}</textarea></label><button class="delete-area" data-delete-area="${esc(area.id)}">移除这个地区</button></div>` : ""}
   </article>`;
 }
@@ -304,16 +373,132 @@ function renderCandidates() {
   items.forEach(item => { const group = candidateRegion(item); if (!groups.has(group)) groups.set(group, []); groups.get(group).push(item); });
   $("candidateList").innerHTML = [...groups.entries()].map(([group,rows]) => `<section class="candidate-group"><div class="candidate-group-heading"><h3>${esc(group)}</h3><span>${rows.length}</span></div>${rows.map(candidateCard).join("")}</section>`).join("");
 }
-function renderAll({ fitMap = false } = {}) { renderCounts(); renderAreas(); renderCandidates(); renderMap({ fit: fitMap }); updateLayerButtons(); }
+function renderAll({ fitMap = false } = {}) { renderCounts(); renderTripRouteSummary(); renderAreas(); renderCandidates(); renderMap({ fit: fitMap }); updateLayerButtons(); }
 
 function selectArea(id) {
   if (!areaById(id)) return; state.selectedAreaId = id; state.selectedCandidateId = null; state.showAreas = true; state.showCandidates = true;
   saveUserState(); renderAll({ fitMap: true });
 }
 function clearAreaFocus() { state.selectedAreaId = null; state.selectedCandidateId = null; state.showCandidates = state.view === "candidates"; saveUserState(); renderAll({ fitMap: true }); }
-function deleteArea(id) { state.areas = state.areas.filter(area => area.id !== id); if (state.selectedAreaId === id) state.selectedAreaId = null; state.expandedAreas.delete(id); saveUserState(); renderAll({ fitMap: true }); }
+function deleteArea(id) { state.areas = state.areas.filter(area => area.id !== id); if (state.selectedAreaId === id) state.selectedAreaId = null; state.expandedAreas.delete(id); saveUserState(); renderAll({ fitMap: true }); queueRouteRefresh(true); }
 function removeCandidateFromArea(areaId, candidateId) { const area = areaById(areaId); if (!area) return; area.candidateIds = area.candidateIds.filter(id => id !== candidateId); saveUserState(); renderAll({ fitMap: true }); }
 function updateLayerButtons() { $("toggleAreaLayer").classList.toggle("active", state.showAreas); $("toggleCandidateLayer").classList.toggle("active", state.showCandidates); $("toggleMapLegend").classList.toggle("active", state.legendOpen); }
+
+function pointLiteral(point) {
+  const lat = typeof point?.lat === "function" ? point.lat() : point?.lat;
+  const lng = typeof point?.lng === "function" ? point.lng() : point?.lng;
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+}
+function areaRouteWaypoint(area, Place) {
+  if (area.placeId && !String(area.placeId).startsWith("catalog-")) {
+    try { return new Place({ id: area.placeId, requestedLanguage: "zh-CN", requestedRegion: "JP" }); } catch (_) { /* use coordinates */ }
+  }
+  return { lat: area.lat, lng: area.lon };
+}
+async function refreshTripRoutes({ force = false } = {}) {
+  const signature = state.areas.map(area => `${area.id}:${area.lat}:${area.lon}`).join("|");
+  if (state.areas.length < 2 || mapProvider !== "google") {
+    state.routeLegs = []; state.routeStatus = state.areas.length < 2 ? "idle" : "unavailable"; state.routeSignature = signature; renderTripRouteSummary(); return;
+  }
+  if (!force && signature === state.routeSignature && state.routeLegs.length === state.areas.length - 1) return;
+  const requestId = ++state.routeRequestId;
+  state.routeSignature = signature; state.routeStatus = "loading"; state.routeLegs = []; renderTripRouteSummary(); renderAreas();
+  try {
+    const [{ Route }, { Place }] = await Promise.all([google.maps.importLibrary("routes"),google.maps.importLibrary("places")]);
+    const legs = [];
+    for (let index = 1; index < state.areas.length; index += 1) {
+      if (requestId !== state.routeRequestId) return;
+      const from = state.areas[index - 1]; const to = state.areas[index];
+      try {
+        const { routes } = await Route.computeRoutes({
+          origin: areaRouteWaypoint(from, Place), destination: areaRouteWaypoint(to, Place), travelMode: "DRIVING",
+          routingPreference: "TRAFFIC_UNAWARE", language: "zh-CN", region: "JP",
+          fields: ["distanceMeters","durationMillis","path"],
+        });
+        const route = routes?.[0];
+        if (!route) throw new Error("No route returned");
+        legs.push({ fromId: from.id, toId: to.id, distanceMeters: route.distanceMeters, durationMillis: route.durationMillis,
+          path: (route.path || []).map(pointLiteral).filter(Boolean) });
+      } catch (error) {
+        console.warn(`Route unavailable for ${from.name} → ${to.name}:`, error?.message || error);
+        legs.push({ fromId: from.id, toId: to.id, error: error?.message || "route unavailable" });
+      }
+    }
+    if (requestId !== state.routeRequestId) return;
+    state.routeLegs = legs; state.routeStatus = legs.some(leg => leg.error) ? (legs.some(leg => !leg.error) ? "partial" : "unavailable") : "ready";
+  } catch (error) {
+    console.warn("Google Routes library unavailable:", error?.message || error);
+    if (requestId !== state.routeRequestId) return;
+    state.routeLegs = []; state.routeStatus = "unavailable";
+  }
+  renderAll();
+}
+function queueRouteRefresh(force = false) { window.setTimeout(() => void refreshTripRoutes({ force }), 0); }
+
+async function refreshAreaDetails(areaId, { quiet = false } = {}) {
+  const area = areaById(areaId); if (!area || !state.placesReady || !area.placeId) return;
+  if (!quiet) showToast(`正在更新 ${area.name} 的地点资料…`);
+  try {
+    const { Place } = await google.maps.importLibrary("places");
+    const place = new Place({ id: area.placeId, requestedLanguage: "zh-CN", requestedRegion: "JP" });
+    await place.fetchFields({ fields: ["id","displayName","formattedAddress","location","viewport","primaryType","types","businessStatus","addressComponents"] });
+    if (place.location) { area.lat = place.location.lat(); area.lon = place.location.lng(); }
+    area.name = place.displayName || area.name; area.address = place.formattedAddress || area.address;
+    area.viewport = viewportJSON(place.viewport); area.primaryType = place.primaryType || area.primaryType;
+    area.types = place.types || area.types; area.businessStatus = place.businessStatus || area.businessStatus;
+    area.addressComponents = simplifyAddressComponents(place.addressComponents); saveUserState(); renderAll({ fitMap: true });
+    if (!quiet) showToast("地点资料已更新");
+  } catch (error) {
+    console.warn("Area details unavailable:", error?.message || error);
+    if (!quiet) showToast("暂时无法更新地点资料");
+  }
+}
+
+function renderNearbySheet() {
+  const area = areaById(state.nearbyAreaId); const sheet = $("nearbySheet");
+  if (!area) { sheet.hidden = true; return; }
+  sheet.hidden = false; $("nearbyTitle").textContent = `${area.name}周边`;
+  $("nearbyTypeChips").innerHTML = Object.entries(NEARBY_TYPES).map(([value,label]) => `<button class="nearby-chip${state.nearbyType === value ? " active" : ""}" data-nearby-type="${esc(value)}">${esc(label)}</button>`).join("");
+  const target = $("nearbyResults");
+  if (state.nearbyStatus === "loading") { target.innerHTML = '<div class="nearby-loading"><span class="route-spinner"></span><strong>正在寻找附近地点…</strong></div>'; return; }
+  if (state.nearbyStatus === "error") { target.innerHTML = '<div class="nearby-empty"><strong>暂时无法取得周边地点</strong><span>请稍后重试，或选择其他类型。</span><button data-retry-nearby>重试</button></div>'; return; }
+  if (!state.nearbyPlaces.length) { target.innerHTML = '<div class="nearby-empty"><strong>附近没有找到此类地点</strong><span>换一个类型试试看。</span></div>'; return; }
+  target.innerHTML = state.nearbyPlaces.map(place => {
+    const selected = place.id === state.selectedNearbyPlaceId;
+    const status = labelBusinessStatus(place.businessStatus);
+    return `<button class="nearby-result${selected ? " selected" : ""}" data-focus-nearby="${esc(place.id)}"><span class="nearby-pin">${selected ? "●" : "⌖"}</span><span class="nearby-copy"><strong>${esc(place.displayName || "未命名地点")}</strong><span>${place.rating ? `★ ${esc(place.rating.toFixed(1))}${place.userRatingCount ? `（${esc(place.userRatingCount)}）` : ""}` : esc(place.primaryType || NEARBY_TYPES[state.nearbyType])}${status ? ` · ${esc(status)}` : ""}</span><small>${esc(place.formattedAddress || "")}</small></span></button>`;
+  }).join("");
+}
+async function searchNearby() {
+  const area = areaById(state.nearbyAreaId); if (!area) return;
+  state.nearbyStatus = "loading"; state.nearbyPlaces = []; state.selectedNearbyPlaceId = null; renderNearbySheet(); renderMap();
+  try {
+    const { Place, SearchNearbyRankPreference } = await google.maps.importLibrary("places");
+    const { places } = await Place.searchNearby({
+      fields: ["id","displayName","formattedAddress","location","primaryType","rating","userRatingCount","businessStatus"],
+      locationRestriction: { center: { lat: area.lat, lng: area.lon }, radius: 15000 },
+      includedPrimaryTypes: [state.nearbyType], maxResultCount: 10,
+      rankPreference: SearchNearbyRankPreference.POPULARITY, language: "zh-CN", region: "JP",
+    });
+    state.nearbyPlaces = places || []; state.nearbyStatus = "ready";
+  } catch (error) {
+    console.warn("Nearby Search unavailable:", error?.message || error);
+    state.nearbyPlaces = []; state.nearbyStatus = "error";
+  }
+  renderNearbySheet(); renderMap();
+}
+function openNearby(areaId) {
+  const area = areaById(areaId); if (!area) return;
+  state.nearbyAreaId = area.id; state.selectedAreaId = area.id; state.selectedCandidateId = null; state.nearbyStatus = "loading";
+  renderAll({ fitMap: true }); renderNearbySheet(); void searchNearby();
+}
+function closeNearby() {
+  state.nearbyAreaId = null; state.nearbyPlaces = []; state.selectedNearbyPlaceId = null; state.nearbyStatus = "idle"; renderNearbySheet(); renderMap();
+}
+function focusNearbyPlace(placeId) {
+  const place = state.nearbyPlaces.find(item => item.id === placeId); if (!place?.location) return;
+  state.selectedNearbyPlaceId = placeId; focusMapAt(place.location.lat(), place.location.lng(), 15); renderNearbySheet(); renderMap();
+}
 
 function catalogMatches(query) {
   const value = query.trim().toLowerCase(); if (!value) return [];
@@ -375,7 +560,7 @@ async function previewLivePlace(index) {
   $("areaSearchResults").innerHTML = '<div class="search-empty">正在确认地区…</div>';
   try {
     const place = prediction.toPlace();
-    await place.fetchFields({ fields: ["id", "displayName", "formattedAddress", "location", "primaryType"] });
+    await place.fetchFields({ fields: ["id","displayName","formattedAddress","location","viewport","primaryType","types","businessStatus","addressComponents"] });
     if (!place.location) throw new Error("missing location");
     state.searchSessionToken = null;
     showPlacePreview({
@@ -384,6 +569,8 @@ async function previewLivePlace(index) {
       google_title: place.displayName || prediction.text.toString(),
       formatted_address: place.formattedAddress || prediction.secondaryText?.toString() || "日本",
       lat: place.location.lat(), lon: place.location.lng(), place_type: place.primaryType || "city_or_area",
+      viewport: viewportJSON(place.viewport), types: place.types || [], business_status: place.businessStatus || "",
+      address_components: simplifyAddressComponents(place.addressComponents),
     });
   } catch (_) {
     $("areaSearchResults").innerHTML = '<div class="search-empty">无法读取这个地区，请重新搜索</div>';
@@ -393,17 +580,19 @@ async function previewLivePlace(index) {
 function showPlacePreview(place) {
   state.searchPreview = place; $("areaSearchResults").hidden = true; $("mapFocusCard").hidden = true;
   const existing = state.areas.find(area => area.placeId === place.place_id);
-  $("placePreview").innerHTML = `<div class="preview-top"><div class="preview-symbol">⌖</div><div class="preview-copy"><p class="preview-meta">Google Maps 地点 / 地区</p><h3>${esc(place.name_zh)}</h3><p>${esc(place.formatted_address)}</p></div></div><div class="preview-actions"><button class="primary-button" data-add-preview-place>${existing ? "查看已加入地点" : "加入行程 ⭐"}</button><button class="secondary-button" data-dismiss-preview>取消</button></div>`;
+  const status = labelBusinessStatus(place.business_status);
+  $("placePreview").innerHTML = `<div class="preview-top"><div class="preview-symbol">⌖</div><div class="preview-copy"><p class="preview-meta">Google Maps 地点 / 地区</p><h3>${esc(place.name_zh)}</h3><p>${esc(place.formatted_address)}</p><div class="place-preview-meta">${place.place_type ? `<span>${esc(place.place_type)}</span>` : ""}${status ? `<span>${esc(status)}</span>` : ""}</div></div></div><div class="preview-actions"><button class="primary-button" data-add-preview-place>${existing ? "查看已加入地点" : "加入行程 ⭐"}</button><button class="secondary-button" data-dismiss-preview>取消</button></div>`;
   $("placePreview").hidden = false; clearMapLayer(previewLayer);
   if (mapProvider === "google") {
     const marker = new google.maps.Marker({
       position: { lat: place.lat, lng: place.lon }, map, title: place.name_zh,
       icon: { path: google.maps.SymbolPath.CIRCLE, scale: 10, fillColor: "#1f6b53", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 3 },
     });
-    previewLayer.push(marker); map.setCenter({ lat: place.lat, lng: place.lon }); map.setZoom(9);
+    previewLayer.push(marker); if (place.viewport) map.fitBounds(place.viewport, 72); else { map.setCenter({ lat: place.lat, lng: place.lon }); map.setZoom(9); }
   } else {
     L.circleMarker([place.lat, place.lon], { radius: 10, color: "#fff", weight: 3, fillColor: "#1f6b53", fillOpacity: 1 }).addTo(previewLayer);
-    map.setView([place.lat, place.lon], 9, { animate: true });
+    if (place.viewport) map.fitBounds([[place.viewport.south,place.viewport.west],[place.viewport.north,place.viewport.east]], { padding: [70,70], animate: true });
+    else map.setView([place.lat, place.lon], 9, { animate: true });
   }
 }
 function addPreviewPlace() {
@@ -411,9 +600,11 @@ function addPreviewPlace() {
   const existing = state.areas.find(area => area.placeId === place.place_id);
   if (existing) { dismissPreview(); return selectArea(existing.id); }
   const id = `area-${place.place_id}`;
-  state.areas.push({ id, placeId: place.place_id, name: place.name_zh, address: place.formatted_address, lat: place.lat, lon: place.lon, startDate: "", endDate: "", nights: "", note: "", candidateIds: [] });
-  state.expandedAreas.add(id); state.selectedAreaId = id; state.showAreas = true; state.showCandidates = true;
-  dismissPreview(); saveUserState(); renderAll({ fitMap: true });
+  state.areas.push({ id, placeId: place.place_id, name: place.name_zh, address: place.formatted_address, lat: place.lat, lon: place.lon,
+    viewport: viewportJSON(place.viewport), primaryType: place.place_type || "", types: place.types || [], businessStatus: place.business_status || "",
+    addressComponents: place.address_components || [], startDate: "", endDate: "", nights: "", note: "", candidateIds: [] });
+  state.expandedAreas.clear(); state.expandedAreas.add(id); state.selectedAreaId = id; state.showAreas = true; state.showCandidates = true;
+  dismissPreview(); saveUserState(); renderAll({ fitMap: true }); queueRouteRefresh();
 }
 function dismissPreview() { state.searchPreview = null; $("placePreview").hidden = true; clearMapLayer(previewLayer); renderMapFocusCard(); }
 
@@ -449,6 +640,42 @@ function renderVisualEvidence(item) {
   if (!assets.length) return "";
   return `<div class="gallery">${assets.map(asset => { const url = asset.asset_url || asset.source_page_url; return `<figure>${asset.asset_url ? `<img src="${esc(asset.asset_url)}" alt="${esc(asset.caption || item.name)}" loading="lazy">` : '<div class="photo-placeholder">VISUAL SOURCE</div>'}<figcaption>${esc(shown(asset.what_this_image_is_showing || asset.caption))}</figcaption></figure>`; }).join("")}</div>`;
 }
+function yesNoFeature(label, value) { return value === true ? `<span class="google-feature">✓ ${esc(label)}</span>` : ""; }
+function renderGooglePlaceDetails(item) {
+  const placeId = item.location?.provider_place_id;
+  if (!placeId || !state.placesReady) return "";
+  if (state.placeDetailsLoading.has(item.id)) return '<section class="google-place-card loading"><span class="route-spinner"></span><div><strong>正在读取 Google 地点资料</strong><small>营业时间、评分和实用设施</small></div></section>';
+  const detail = state.placeDetails.get(item.id);
+  if (!detail) return '<section class="google-place-card"><div><strong>Google 地点资料暂不可用</strong><small>研究资料仍可正常查看</small></div><button data-refresh-google-detail="true">重试</button></section>';
+  const currentHours = detail.currentOpeningHours?.weekdayDescriptions || [];
+  const regularHours = detail.regularOpeningHours?.weekdayDescriptions || [];
+  const photo = detail.photos?.[0]; const photoUrl = photo?.getURI ? photo.getURI({ maxWidth: 1000, maxHeight: 560 }) : "";
+  const attributions = (photo?.authorAttributions || []).map(author => author.uri ? `<a href="${esc(author.uri)}" target="_blank" rel="noopener">${esc(author.displayName || "照片提供者")}</a>` : esc(author.displayName || "")).join(" · ");
+  const accessibility = detail.accessibilityOptions || {}; const parking = detail.parkingOptions || {};
+  const features = [
+    yesNoFeature("无障碍入口",accessibility.hasWheelchairAccessibleEntrance), yesNoFeature("无障碍停车",accessibility.hasWheelchairAccessibleParking),
+    yesNoFeature("无障碍洗手间",accessibility.hasWheelchairAccessibleRestroom), yesNoFeature("设有洗手间",detail.hasRestroom),
+    yesNoFeature("可预约",detail.isReservable), yesNoFeature("免费停车场",parking.hasFreeParkingLot), yesNoFeature("收费停车场",parking.hasPaidParkingLot),
+  ].filter(Boolean).join("");
+  const status = labelBusinessStatus(detail.businessStatus);
+  return `<section class="google-place-card">${photoUrl ? `<figure><img src="${esc(photoUrl)}" alt="${esc(item.name)} Google 地点照片"><figcaption>${attributions ? `照片：${attributions}` : "Google 地点照片"}</figcaption></figure>` : ""}<div class="google-place-content"><div class="google-place-heading"><div><span>GOOGLE 地点资料</span><strong>${esc(detail.displayName || item.name)}</strong></div>${detail.rating ? `<div class="google-rating"><b>${esc(detail.rating.toFixed(1))}</b><span>★</span><small>${esc(detail.userRatingCount || 0)} 条评分</small></div>` : ""}</div><div class="google-place-facts">${status ? `<span>${esc(status)}</span>` : ""}${detail.priceLevel ? `<span>${esc(detail.priceLevel)}</span>` : ""}${detail.nationalPhoneNumber ? `<a href="tel:${esc(detail.nationalPhoneNumber)}">${esc(detail.nationalPhoneNumber)}</a>` : ""}${detail.websiteURI ? `<a href="${esc(detail.websiteURI)}" target="_blank" rel="noopener">官方网站 ↗</a>` : ""}</div>${features ? `<div class="google-features">${features}</div>` : ""}${currentHours.length || regularHours.length ? `<details class="opening-hours"><summary>查看营业时间</summary><div>${(currentHours.length ? currentHours : regularHours).map(row => `<span>${esc(row)}</span>`).join("")}</div></details>` : ""}<small class="google-freshness">实时资料可能变化，出发前请再次刷新。</small></div></section>`;
+}
+async function loadCandidateGoogleDetails(item, { force = false } = {}) {
+  const placeId = item.location?.provider_place_id;
+  if (!placeId || !state.placesReady || state.placeDetailsLoading.has(item.id) || (!force && state.placeDetails.has(item.id))) return;
+  state.placeDetailsLoading.add(item.id); if ($("detailDialog").open) renderCandidateDetail(item);
+  try {
+    const { Place } = await google.maps.importLibrary("places");
+    const place = new Place({ id: placeId, requestedLanguage: "zh-CN", requestedRegion: "JP" });
+    await place.fetchFields({ fields: ["displayName","formattedAddress","businessStatus","rating","userRatingCount","regularOpeningHours","currentOpeningHours","websiteURI","nationalPhoneNumber","internationalPhoneNumber","priceLevel","photos","accessibilityOptions","parkingOptions","hasRestroom","isReservable"] });
+    state.placeDetails.set(item.id, place);
+  } catch (error) {
+    console.warn(`Google details unavailable for ${item.id}:`, error?.message || error);
+    state.placeDetails.delete(item.id);
+  }
+  state.placeDetailsLoading.delete(item.id);
+  if ($("detailDialog").open && state.selectedCandidateId === item.id) renderCandidateDetail(item);
+}
 function renderDetailAreaAction(item) {
   const current = areaForCandidate(item.id);
   if (!state.areas.length) return `<div class="detail-area-action"><div><strong>加入行程地区</strong><span>先在地图上搜索并添加一个市或地区。</span></div><button class="primary-button" data-go-to-areas>添加地区</button></div>`;
@@ -462,12 +689,13 @@ function renderCandidateDetail(item) {
   const tripExperience = dl([["9 月旅行体验",item.experience?.sep_2026_experience],["时间窗口",friendlyTiming(item.experience?.trip_window_fit)],["建议行程阶段",friendlyTiming(position.preferred_trip_segment)]]);
   const practical = dl([["建议停留时间",item.experience?.realistic_duration],["天气影响",item.experience?.weather_dependency],["体力要求",item.experience?.physical_load],["所在市町",item.municipality]]);
   const disappointment = known(item.experience?.common_disappointments) ? `<p>${esc(shown(item.experience.common_disappointments))}</p>` : "";
-  $("detailContent").innerHTML = `<header class="detail-hero"><span class="detail-category" style="--category-color:${COLORS[item.category]}">${esc(labelCategory(item.category))}</span><h2>${esc(item.name)}</h2>${altNames ? `<p class="alt-names">${altNames}</p>` : ""}</header>${renderDetailAreaAction(item)}<div class="detail-body"><div class="detail-tags">${area ? `<span class="detail-tag">已加入 ${esc(area.name)}</span>` : `<span class="detail-tag neutral">尚未加入地区</span>`}${item.municipality ? `<span class="detail-tag neutral">${esc(item.municipality)}</span>` : ""}</div>${infoSection("30 秒了解", preview)}${infoSection("实际会做什么", displayList(item.experience?.what_you_actually_do))}${infoSection("9 月 5–18 日体验", tripExperience)}${infoSection("实用信息", practical)}${infoSection("可能失望之处", disappointment)}${infoSection("视觉资料",renderVisualEvidence(item))}</div>`;
+  $("detailContent").innerHTML = `<header class="detail-hero"><span class="detail-category" style="--category-color:${COLORS[item.category]}">${esc(labelCategory(item.category))}</span><h2>${esc(item.name)}</h2>${altNames ? `<p class="alt-names">${altNames}</p>` : ""}</header>${renderDetailAreaAction(item)}<div class="detail-body"><div class="detail-tags">${area ? `<span class="detail-tag">已加入 ${esc(area.name)}</span>` : `<span class="detail-tag neutral">尚未加入地区</span>`}${item.municipality ? `<span class="detail-tag neutral">${esc(item.municipality)}</span>` : ""}</div>${renderGooglePlaceDetails(item)}${infoSection("30 秒了解", preview)}${infoSection("实际会做什么", displayList(item.experience?.what_you_actually_do))}${infoSection("9 月 5–18 日体验", tripExperience)}${infoSection("实用信息", practical)}${infoSection("可能失望之处", disappointment)}${infoSection("视觉资料",renderVisualEvidence(item))}</div>`;
 }
 function openCandidate(id) {
   const item = candidateById(id); if (!item) return;
   renderCandidateDetail(item);
   if (!$("detailDialog").open) $("detailDialog").showModal();
+  void loadCandidateGoogleDetails(item);
 }
 function focusCandidate(id, { showDetails = false } = {}) {
   const item = candidateById(id); if (!item) return;
@@ -503,7 +731,12 @@ function setupInteractions() {
     if (catalogButton) previewPlace(catalogButton.dataset.previewPlace);
   });
   $("placePreview").addEventListener("click", event => { if (event.target.closest("[data-add-preview-place]")) addPreviewPlace(); if (event.target.closest("[data-dismiss-preview]")) dismissPreview(); });
-  $("mapFocusCard").addEventListener("click", event => { if (event.target.closest("[data-clear-area-focus]")) clearAreaFocus(); const reopen = event.target.closest("[data-reopen-candidate]"); if (reopen) openCandidate(reopen.dataset.reopenCandidate); });
+  $("mapFocusCard").addEventListener("click", event => {
+    if (event.target.closest("[data-clear-area-focus]")) return clearAreaFocus();
+    const reopen = event.target.closest("[data-reopen-candidate]"); if (reopen) return openCandidate(reopen.dataset.reopenCandidate);
+    const nearby = event.target.closest("[data-explore-nearby]"); if (nearby) return openNearby(nearby.dataset.exploreNearby);
+    const refresh = event.target.closest("[data-refresh-area]"); if (refresh) return void refreshAreaDetails(refresh.dataset.refreshArea);
+  });
   $("toggleAreaLayer").addEventListener("click", () => { state.showAreas = !state.showAreas; renderMap(); updateLayerButtons(); });
   $("toggleCandidateLayer").addEventListener("click", () => { state.showCandidates = !state.showCandidates; renderMap({ fit: state.showCandidates }); updateLayerButtons(); });
   $("toggleMapLegend").addEventListener("click", () => { state.legendOpen = !state.legendOpen; renderMap(); updateLayerButtons(); });
@@ -513,6 +746,7 @@ function setupInteractions() {
     const toggle = event.target.closest("[data-toggle-area-candidates]"); if (toggle) { const id = toggle.dataset.toggleAreaCandidates; if (state.expandedAreas.has(id)) state.expandedAreas.delete(id); else { state.expandedAreas.clear(); state.expandedAreas.add(id); } state.selectedAreaId = id; state.selectedCandidateId = null; state.showCandidates = true; saveUserState(); return renderAll({ fitMap: true }); }
     const edit = event.target.closest("[data-toggle-area-editor]"); if (edit) { const area = areaById(edit.dataset.toggleAreaEditor); if (area) { area.editing = !area.editing; state.selectedAreaId = area.id; renderAreas(); } return; }
     const picker = event.target.closest("[data-open-picker]"); if (picker) return openPicker(picker.dataset.openPicker);
+    const nearby = event.target.closest("[data-explore-nearby]"); if (nearby) return openNearby(nearby.dataset.exploreNearby);
     const remove = event.target.closest("[data-remove-candidate]"); if (remove) return removeCandidateFromArea(remove.dataset.areaId, remove.dataset.removeCandidate);
     const detail = event.target.closest("[data-open-candidate-detail]"); if (detail) return focusCandidate(detail.dataset.openCandidateDetail, { showDetails: true });
     const focus = event.target.closest("[data-focus-candidate]"); if (focus) return focusCandidate(focus.dataset.focusCandidate, { showDetails: false });
@@ -522,7 +756,11 @@ function setupInteractions() {
   $("areaList").addEventListener("dragstart", event => { const card = event.target.closest("[data-area-card]"); if (card) { state.draggedAreaId = card.dataset.areaCard; card.classList.add("dragging"); } });
   $("areaList").addEventListener("dragend", event => { event.target.closest("[data-area-card]")?.classList.remove("dragging"); state.draggedAreaId = null; });
   $("areaList").addEventListener("dragover", event => event.preventDefault());
-  $("areaList").addEventListener("drop", event => { event.preventDefault(); const target = event.target.closest("[data-area-card]")?.dataset.areaCard; if (!target || !state.draggedAreaId || target === state.draggedAreaId) return; const from = state.areas.findIndex(area => area.id === state.draggedAreaId); const to = state.areas.findIndex(area => area.id === target); const [moved] = state.areas.splice(from,1); state.areas.splice(to,0,moved); saveUserState(); renderAll({ fitMap: true }); });
+  $("areaList").addEventListener("drop", event => { event.preventDefault(); const target = event.target.closest("[data-area-card]")?.dataset.areaCard; if (!target || !state.draggedAreaId || target === state.draggedAreaId) return; const from = state.areas.findIndex(area => area.id === state.draggedAreaId); const to = state.areas.findIndex(area => area.id === target); const [moved] = state.areas.splice(from,1); state.areas.splice(to,0,moved); saveUserState(); renderAll({ fitMap: true }); queueRouteRefresh(true); });
+  $("tripRouteSummary").addEventListener("click", event => { if (event.target.closest("[data-refresh-routes]")) queueRouteRefresh(true); });
+  $("closeNearby").addEventListener("click", closeNearby);
+  $("nearbyTypeChips").addEventListener("click", event => { const chip = event.target.closest("[data-nearby-type]"); if (!chip) return; state.nearbyType = chip.dataset.nearbyType; void searchNearby(); });
+  $("nearbyResults").addEventListener("click", event => { const result = event.target.closest("[data-focus-nearby]"); if (result) return focusNearbyPlace(result.dataset.focusNearby); if (event.target.closest("[data-retry-nearby]")) void searchNearby(); });
   $("candidateList").addEventListener("click", event => { const detail = event.target.closest("[data-open-candidate-detail]"); if (detail) return focusCandidate(detail.dataset.openCandidateDetail, { showDetails: true }); const add = event.target.closest("[data-quick-add-candidate]"); if (add) return focusCandidate(add.dataset.quickAddCandidate, { showDetails: true }); const focus = event.target.closest("[data-focus-candidate]"); if (focus) return focusCandidate(focus.dataset.focusCandidate, { showDetails: false }); });
   $("candidateCategoryChips").addEventListener("click", event => { const chip = event.target.closest("[data-category-chip]"); if (!chip) return; state.candidateCategory = chip.dataset.categoryChip; renderCandidates(); renderCounts(); if (state.view === "candidates") renderMap({fit:true}); });
   $("candidateSearch").addEventListener("input", event => { state.candidateQuery = event.target.value; renderCandidates(); renderCounts(); if (state.view === "candidates") renderMap({fit:true}); });
@@ -536,6 +774,7 @@ function setupInteractions() {
   $("detailContent").addEventListener("click", event => {
     const assign = event.target.closest("[data-assign-candidate]");
     if (assign) return assignCandidateToArea(assign.dataset.assignCandidate, $("detailAreaSelect")?.value);
+    if (event.target.closest("[data-refresh-google-detail]")) { const item = candidateById(state.selectedCandidateId); if (item) void loadCandidateGoogleDetails(item, { force: true }); return; }
     if (event.target.closest("[data-go-to-areas]")) { $("detailDialog").close(); switchView("areas"); $("areaSearch").focus(); }
   });
 }
@@ -546,7 +785,7 @@ async function boot() {
     const responses = await Promise.all(paths.map(path => fetch(path))); if (responses.some(response => !response.ok)) throw new Error("数据文件无法读取");
     const [master,locations,batches,catalog] = await Promise.all(responses.map(response => response.json()));
     state.candidates = window.ResearchDataAdapter.buildCandidateViewModels(master,locations,batches); state.catalog = catalog.places || [];
-    loadUserState(); fillCategorySelect($("pickerCategory")); await initMap(); setupInteractions(); renderAll({ fitMap: true });
+    loadUserState(); fillCategorySelect($("pickerCategory")); await initMap(); setupInteractions(); renderAll({ fitMap: true }); queueRouteRefresh();
   } catch (error) {
     $("areaList").innerHTML = `<div class="empty-state"><h3>无法载入地图数据</h3><p>${esc(error.message)}</p></div>`;
   }

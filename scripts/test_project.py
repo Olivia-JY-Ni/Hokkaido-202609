@@ -165,12 +165,22 @@ def main() -> int:
         failures.append("deferred Google Maps external-open feature was added")
     if "AutocompleteSuggestion.fetchAutocompleteSuggestions" not in app_text or "AutocompleteSessionToken" not in app_text:
         failures.append("live Google Maps area autocomplete with billing sessions is missing")
-    if 'includedPrimaryTypes:' in app_text or 'includedRegionCodes:' in app_text:
+    autocomplete_request = app_text.split("AutocompleteSuggestion.fetchAutocompleteSuggestions", 1)[-1].split("});", 1)[0]
+    if 'includedPrimaryTypes:' in autocomplete_request or 'includedRegionCodes:' in autocomplete_request:
         failures.append("live Google Maps search still filters out valid places or countries")
     if "radius: 850000" in app_text:
         failures.append("Places autocomplete uses a circle radius beyond Google's 50 km limit")
-    if 'fields: ["id", "displayName", "formattedAddress", "location", "primaryType"]' not in app_text:
-        failures.append("selected live area does not fetch the required identity and coordinate fields")
+    core_place_fields = ('"viewport"', '"types"', '"businessStatus"', '"addressComponents"')
+    if 'await place.fetchFields({ fields: ["id","displayName","formattedAddress","location","viewport","primaryType","types","businessStatus","addressComponents"] })' not in app_text or any(field not in app_text for field in core_place_fields):
+        failures.append("selected live area does not fetch identity, coordinates, viewport, type, status, and address structure")
+    if "Place.searchNearby" not in app_text or "includedPrimaryTypes" not in app_text or "data-nearby-type" not in app_text:
+        failures.append("on-demand Google Nearby Search exploration is missing")
+    if "Route.computeRoutes" not in app_text or 'travelMode: "DRIVING"' not in app_text or "durationMillis" not in app_text or "distanceMeters" not in app_text:
+        failures.append("ordered itinerary driving distance and duration requests are missing")
+    if "loadCandidateGoogleDetails" not in app_text or "regularOpeningHours" not in app_text or "userRatingCount" not in app_text or "accessibilityOptions" not in app_text:
+        failures.append("on-demand Google Candidate details are missing")
+    if "tripRouteSummary" not in index_text or "nearbySheet" not in index_text:
+        failures.append("route summary or nearby exploration UI is missing")
     if 'mapProvider = "google"' not in app_text or 'importLibrary("maps")' not in app_text:
         failures.append("Google Places results are not paired with a Google map")
     if "initLeafletMap" not in app_text or "无法正确加载 Google 地图" not in app_text:
