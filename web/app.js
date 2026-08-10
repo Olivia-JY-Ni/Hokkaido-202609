@@ -278,6 +278,7 @@ async function renderAreaSearchResults() {
   if (!state.placesReady || mapProvider !== "google") return renderCatalogSearchResults(trimmed, true);
 
   const requestId = ++state.searchRequestId;
+  delete $("areaSearchResults").dataset.liveSearchError;
   $("areaSearchResults").innerHTML = '<div class="search-empty">正在搜索 Google Maps…</div>';
   $("areaSearchResults").hidden = false;
   try {
@@ -294,7 +295,10 @@ async function renderAreaSearchResults() {
     });
     if (requestId !== state.searchRequestId || $("areaSearch").value.trim() !== trimmed) return;
     renderLiveSearchResults(suggestions.map(item => item.placePrediction).filter(Boolean).slice(0, 8));
-  } catch (_) {
+  } catch (error) {
+    const message = error?.message || String(error);
+    $("areaSearchResults").dataset.liveSearchError = message;
+    console.warn("Google Places autocomplete unavailable:", message);
     if (requestId === state.searchRequestId) renderCatalogSearchResults(trimmed, true);
   }
 }
