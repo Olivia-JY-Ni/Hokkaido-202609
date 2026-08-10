@@ -327,7 +327,7 @@ function renderCatalogSearchResults(query, apiUnavailable = false) {
 }
 function renderLiveSearchResults(predictions) {
   state.livePredictions = predictions;
-  $("areaSearchResults").innerHTML = predictions.length ? predictions.map((prediction, index) => `<button class="search-result" data-preview-live-place="${index}"><span class="result-pin">⌖</span><span><strong>${esc(prediction.mainText?.toString() || prediction.text.toString())}</strong><p>${esc(prediction.secondaryText?.toString() || "日本")}</p></span><span class="provider-tag">Google Maps</span></button>`).join("") : '<div class="search-empty">Google Maps 中没有匹配的市或地区</div>';
+  $("areaSearchResults").innerHTML = predictions.length ? predictions.map((prediction, index) => `<button class="search-result" data-preview-live-place="${index}"><span class="result-pin">⌖</span><span><strong>${esc(prediction.mainText?.toString() || prediction.text.toString())}</strong><p>${esc(prediction.secondaryText?.toString() || "Google Maps")}</p></span><span class="provider-tag">Google Maps</span></button>`).join("") : '<div class="search-empty">Google Maps 中没有匹配地点</div>';
   $("areaSearchResults").hidden = false;
 }
 async function renderAreaSearchResults() {
@@ -346,8 +346,6 @@ async function renderAreaSearchResults() {
     const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
       input: trimmed,
       sessionToken: state.searchSessionToken,
-      includedPrimaryTypes: ["(regions)"],
-      includedRegionCodes: ["jp"],
       language: "zh-CN",
       region: "jp",
     });
@@ -395,7 +393,7 @@ async function previewLivePlace(index) {
 function showPlacePreview(place) {
   state.searchPreview = place; $("areaSearchResults").hidden = true; $("mapFocusCard").hidden = true;
   const existing = state.areas.find(area => area.placeId === place.place_id);
-  $("placePreview").innerHTML = `<div class="preview-top"><div class="preview-symbol">⌖</div><div class="preview-copy"><p class="preview-meta">Google Maps 地区</p><h3>${esc(place.name_zh)}</h3><p>${esc(place.formatted_address)}</p></div></div><div class="preview-actions"><button class="primary-button" data-add-preview-place>${existing ? "查看已加入地区" : "加入行程 ⭐"}</button><button class="secondary-button" data-dismiss-preview>取消</button></div>`;
+  $("placePreview").innerHTML = `<div class="preview-top"><div class="preview-symbol">⌖</div><div class="preview-copy"><p class="preview-meta">Google Maps 地点 / 地区</p><h3>${esc(place.name_zh)}</h3><p>${esc(place.formatted_address)}</p></div></div><div class="preview-actions"><button class="primary-button" data-add-preview-place>${existing ? "查看已加入地点" : "加入行程 ⭐"}</button><button class="secondary-button" data-dismiss-preview>取消</button></div>`;
   $("placePreview").hidden = false; clearMapLayer(previewLayer);
   if (mapProvider === "google") {
     const marker = new google.maps.Marker({

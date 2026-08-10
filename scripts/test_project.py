@@ -165,8 +165,8 @@ def main() -> int:
         failures.append("deferred Google Maps external-open feature was added")
     if "AutocompleteSuggestion.fetchAutocompleteSuggestions" not in app_text or "AutocompleteSessionToken" not in app_text:
         failures.append("live Google Maps area autocomplete with billing sessions is missing")
-    if 'includedPrimaryTypes: ["(regions)"]' not in app_text or 'includedRegionCodes: ["jp"]' not in app_text:
-        failures.append("live search is not restricted to Japanese city/area results")
+    if 'includedPrimaryTypes:' in app_text or 'includedRegionCodes:' in app_text:
+        failures.append("live Google Maps search still filters out valid places or countries")
     if "radius: 850000" in app_text:
         failures.append("Places autocomplete uses a circle radius beyond Google's 50 km limit")
     if 'fields: ["id", "displayName", "formattedAddress", "location", "primaryType"]' not in app_text:
