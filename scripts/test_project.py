@@ -155,6 +155,8 @@ def main() -> int:
         failures.append("live Google Maps area autocomplete with billing sessions is missing")
     if 'includedPrimaryTypes: ["(regions)"]' not in app_text or 'includedRegionCodes: ["jp"]' not in app_text:
         failures.append("live search is not restricted to Japanese city/area results")
+    if "radius: 850000" in app_text:
+        failures.append("Places autocomplete uses a circle radius beyond Google's 50 km limit")
     if 'fields: ["id", "displayName", "formattedAddress", "location", "primaryType"]' not in app_text:
         failures.append("selected live area does not fetch the required identity and coordinate fields")
     if 'mapProvider = "google"' not in app_text or 'importLibrary("maps")' not in app_text:

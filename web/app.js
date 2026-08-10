@@ -289,7 +289,6 @@ async function renderAreaSearchResults() {
       sessionToken: state.searchSessionToken,
       includedPrimaryTypes: ["(regions)"],
       includedRegionCodes: ["jp"],
-      locationBias: { center: { lat: 43.35, lng: 142.15 }, radius: 850000 },
       language: "zh-CN",
       region: "jp",
     });
