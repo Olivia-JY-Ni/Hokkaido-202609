@@ -39,11 +39,12 @@
 .area-expanded-heading{display:flex;align-items:center;justify-content:space-between;padding:10px 1px 7px;font-size:10px;font-weight:800;color:var(--muted)}
 .icon-menu-button{font-size:10px;color:var(--green);font-weight:750}
 .area-candidates{border-radius:10px}
-.area-candidate-row{padding:9px 10px;transition:background .15s}
+.area-candidate-row{grid-template-columns:10px minmax(0,1fr) auto auto;padding:9px 10px;transition:background .15s}
 .area-candidate-row:hover,.area-candidate-row.selected{background:var(--green-soft)}
 .area-candidate-row>button:not(.remove-mini){display:grid;gap:2px}
 .area-candidate-row strong{font-size:11px;overflow:hidden;text-overflow:ellipsis}
 .area-candidate-row button span{font-size:9px;color:var(--muted)}
+.area-detail-button{color:var(--green);font-weight:800!important;font-size:9px!important}
 .area-empty-candidates{display:grid;gap:3px;padding:15px}
 .area-empty-candidates strong{font-size:11px;color:var(--ink)}
 .area-empty-candidates span{font-size:10px}
@@ -72,8 +73,10 @@
 .candidate-meta{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .candidate-summary{font-size:10px;color:#48514e;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .candidate-card .area-label{flex:none;margin:0;padding:3px 6px;font-size:8px}
-.candidate-quick-add{border:0;border-left:1px solid var(--line);background:transparent;color:var(--green);align-self:stretch;padding:8px 11px;font-size:9px;font-weight:800;white-space:nowrap}
-.candidate-quick-add:hover{background:var(--green-soft)}
+.candidate-card-actions{display:flex;align-self:stretch;border-left:1px solid var(--line)}
+.candidate-card-actions button{border:0;background:transparent;color:var(--green);padding:8px 9px;font-size:9px;font-weight:800;white-space:nowrap}
+.candidate-card-actions button+button{border-left:1px solid var(--line)}
+.candidate-card-actions button:hover{background:var(--green-soft)}
 
 .filter-pill[hidden]{display:none}
 .map-legend{display:flex;flex-direction:column;gap:3px;max-width:230px;padding:7px}

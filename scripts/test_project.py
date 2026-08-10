@@ -157,6 +157,8 @@ def main() -> int:
         failures.append("the complete Candidate library is not grouped into user-facing regions")
     if "data-quick-add-candidate" not in app_text or "data-assign-candidate" not in app_text or "assignCandidateToArea" not in app_text:
         failures.append("candidate details do not offer a direct add-to-area workflow")
+    if "data-open-candidate-detail" not in app_text or "showDetails = false" not in app_text:
+        failures.append("candidate selection is not separated from the explicit detail action")
     if "item.status" in app_text or "item.location?.scope" in app_text:
         failures.append("internal research or coordinate status leaked into the user-facing Candidate detail")
     if "在 Google Maps 打开" in index_text + app_text or "google_maps_url" in app_text:

@@ -213,10 +213,10 @@ function renderMap({ fit = false } = {}) {
         zIndex: isSelected ? 1200 : 300,
         icon: { path: google.maps.SymbolPath.CIRCLE, scale: isSelected ? 11 : 7, fillColor: color, fillOpacity: .96, strokeColor: "#fff", strokeWeight: isSelected ? 4 : 2 },
       });
-      marker.addListener("click", () => focusCandidate(item.id)); candidateLayer.push(marker);
+      marker.addListener("click", () => focusCandidate(item.id, { showDetails: false })); candidateLayer.push(marker);
     } else {
       marker = L.circleMarker([item.location.lat, item.location.lon], { radius: isSelected ? 11 : 7, color: "#fff", weight: isSelected ? 4 : 2, fillColor: color, fillOpacity: .96, className: `candidate-map-marker${isSelected ? " is-selected" : ""}` });
-      marker.bindTooltip(item.name, { direction: "top" }); marker.on("click", () => focusCandidate(item.id));
+      marker.bindTooltip(item.name, { direction: "top" }); marker.on("click", () => focusCandidate(item.id, { showDetails: false }));
       marker.addTo(candidateLayer);
       const markerElement = marker.getElement();
       if (markerElement) { markerElement.setAttribute("role", "button"); markerElement.setAttribute("aria-label", item.name); markerElement.setAttribute("tabindex", "0"); }
@@ -267,7 +267,7 @@ function renderCounts() {
 function areaCandidateRows(area) {
   const items = candidatesForArea(area.id);
   if (!items.length) return '<div class="area-empty-candidates"><strong>还没有候选地点</strong><span>点击下方按钮，从资料库中选择。</span></div>';
-  return items.map(item => `<div class="area-candidate-row${item.id === state.selectedCandidateId ? " selected" : ""}"><span class="type-dot" style="background:${COLORS[item.category]}"></span><button data-focus-candidate="${esc(item.id)}"><strong>${esc(item.name)}</strong><span>${esc(labelCategory(item.category))}</span></button><button class="remove-mini" data-remove-candidate="${esc(item.id)}" data-area-id="${esc(area.id)}" aria-label="从地区移除 ${esc(item.name)}">×</button></div>`).join("");
+  return items.map(item => `<div class="area-candidate-row${item.id === state.selectedCandidateId ? " selected" : ""}"><span class="type-dot" style="background:${COLORS[item.category]}"></span><button data-focus-candidate="${esc(item.id)}"><strong>${esc(item.name)}</strong><span>${esc(labelCategory(item.category))}</span></button><button class="area-detail-button" data-open-candidate-detail="${esc(item.id)}">详情</button><button class="remove-mini" data-remove-candidate="${esc(item.id)}" data-area-id="${esc(area.id)}" aria-label="从地区移除 ${esc(item.name)}">×</button></div>`).join("");
 }
 function renderAreaCard(area) {
   const selected = area.id === state.selectedAreaId; const expanded = state.expandedAreas.has(area.id);
@@ -289,7 +289,7 @@ function candidateCard(item) {
   const area = areaForCandidate(item.id);
   const summary = shortSummary(item);
   const duration = known(item.experience?.realistic_duration) ? String(item.experience.realistic_duration) : "";
-  return `<article class="candidate-card${item.id === state.selectedCandidateId ? " selected" : ""}" data-candidate-card="${esc(item.id)}"><button class="candidate-card-main" data-focus-candidate="${esc(item.id)}"><span class="type-dot" style="background:${COLORS[item.category]}"></span><span class="candidate-card-copy"><span class="candidate-name-row"><strong>${esc(item.name)}</strong>${area ? `<span class="area-label">${esc(area.name)}</span>` : ""}</span><span class="candidate-meta">${esc(labelCategory(item.category))}${duration ? ` · ${esc(duration)}` : ""}${item.municipality ? ` · ${esc(item.municipality)}` : ""}</span>${summary ? `<span class="candidate-summary">${esc(summary)}</span>` : ""}</span></button><button class="candidate-quick-add" data-quick-add-candidate="${esc(item.id)}">${area ? "更改地区" : "＋ 加入地区"}</button></article>`;
+  return `<article class="candidate-card${item.id === state.selectedCandidateId ? " selected" : ""}" data-candidate-card="${esc(item.id)}"><button class="candidate-card-main" data-focus-candidate="${esc(item.id)}"><span class="type-dot" style="background:${COLORS[item.category]}"></span><span class="candidate-card-copy"><span class="candidate-name-row"><strong>${esc(item.name)}</strong>${area ? `<span class="area-label">${esc(area.name)}</span>` : ""}</span><span class="candidate-meta">${esc(labelCategory(item.category))}${duration ? ` · ${esc(duration)}` : ""}${item.municipality ? ` · ${esc(item.municipality)}` : ""}</span>${summary ? `<span class="candidate-summary">${esc(summary)}</span>` : ""}</span></button><div class="candidate-card-actions"><button data-open-candidate-detail="${esc(item.id)}">详情</button><button class="candidate-quick-add" data-quick-add-candidate="${esc(item.id)}">${area ? "更改地区" : "＋ 加入地区"}</button></div></article>`;
 }
 function renderCategoryChips() {
   const counts = new Map(); state.candidates.forEach(item => counts.set(item.category, (counts.get(item.category) || 0) + 1));
@@ -471,7 +471,7 @@ function openCandidate(id) {
   renderCandidateDetail(item);
   if (!$("detailDialog").open) $("detailDialog").showModal();
 }
-function focusCandidate(id, { showDetails = true } = {}) {
+function focusCandidate(id, { showDetails = false } = {}) {
   const item = candidateById(id); if (!item) return;
   state.selectedCandidateId = id; state.showCandidates = true;
   renderAll();
@@ -516,7 +516,8 @@ function setupInteractions() {
     const edit = event.target.closest("[data-toggle-area-editor]"); if (edit) { const area = areaById(edit.dataset.toggleAreaEditor); if (area) { area.editing = !area.editing; state.selectedAreaId = area.id; renderAreas(); } return; }
     const picker = event.target.closest("[data-open-picker]"); if (picker) return openPicker(picker.dataset.openPicker);
     const remove = event.target.closest("[data-remove-candidate]"); if (remove) return removeCandidateFromArea(remove.dataset.areaId, remove.dataset.removeCandidate);
-    const focus = event.target.closest("[data-focus-candidate]"); if (focus) return focusCandidate(focus.dataset.focusCandidate);
+    const detail = event.target.closest("[data-open-candidate-detail]"); if (detail) return focusCandidate(detail.dataset.openCandidateDetail, { showDetails: true });
+    const focus = event.target.closest("[data-focus-candidate]"); if (focus) return focusCandidate(focus.dataset.focusCandidate, { showDetails: false });
     const del = event.target.closest("[data-delete-area]"); if (del) return deleteArea(del.dataset.deleteArea);
   });
   $("areaList").addEventListener("input", event => { const field = event.target.dataset.areaField; const area = areaById(event.target.dataset.areaId); if (field && area) { area[field] = event.target.value; saveUserState(); if (field === "name") renderMapFocusCard(); renderCounts(); } });
@@ -524,7 +525,7 @@ function setupInteractions() {
   $("areaList").addEventListener("dragend", event => { event.target.closest("[data-area-card]")?.classList.remove("dragging"); state.draggedAreaId = null; });
   $("areaList").addEventListener("dragover", event => event.preventDefault());
   $("areaList").addEventListener("drop", event => { event.preventDefault(); const target = event.target.closest("[data-area-card]")?.dataset.areaCard; if (!target || !state.draggedAreaId || target === state.draggedAreaId) return; const from = state.areas.findIndex(area => area.id === state.draggedAreaId); const to = state.areas.findIndex(area => area.id === target); const [moved] = state.areas.splice(from,1); state.areas.splice(to,0,moved); saveUserState(); renderAll({ fitMap: true }); });
-  $("candidateList").addEventListener("click", event => { const focus = event.target.closest("[data-focus-candidate]"); if (focus) return focusCandidate(focus.dataset.focusCandidate); const add = event.target.closest("[data-quick-add-candidate]"); if (add) return focusCandidate(add.dataset.quickAddCandidate); });
+  $("candidateList").addEventListener("click", event => { const detail = event.target.closest("[data-open-candidate-detail]"); if (detail) return focusCandidate(detail.dataset.openCandidateDetail, { showDetails: true }); const add = event.target.closest("[data-quick-add-candidate]"); if (add) return focusCandidate(add.dataset.quickAddCandidate, { showDetails: true }); const focus = event.target.closest("[data-focus-candidate]"); if (focus) return focusCandidate(focus.dataset.focusCandidate, { showDetails: false }); });
   $("candidateCategoryChips").addEventListener("click", event => { const chip = event.target.closest("[data-category-chip]"); if (!chip) return; state.candidateCategory = chip.dataset.categoryChip; renderCandidates(); renderCounts(); if (state.view === "candidates") renderMap({fit:true}); });
   $("candidateSearch").addEventListener("input", event => { state.candidateQuery = event.target.value; renderCandidates(); renderCounts(); if (state.view === "candidates") renderMap({fit:true}); });
   $("candidateUnassignedOnly").addEventListener("change", event => { state.candidateUnassignedOnly = event.target.checked; renderCandidates(); renderCounts(); if (state.view === "candidates") renderMap({fit:true}); });
