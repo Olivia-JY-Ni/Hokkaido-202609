@@ -149,6 +149,16 @@ def main() -> int:
         failures.append("area and all-Candidate planner views are not both available")
     if "COLORS[item.category]" not in app_text or "fitBounds" not in app_text or "map.setView" not in app_text:
         failures.append("typed Candidate map colors or selected-area zoom behavior is missing")
+    if "selectedCandidateId" not in app_text or "focusCandidate" not in app_text or "focusMapAt" not in app_text:
+        failures.append("candidate list/map selection state is missing")
+    if "map.flyTo" not in app_text or "map.setZoom(zoom)" not in app_text or "dataset.focusZoom" not in app_text:
+        failures.append("candidate clicks do not provide deterministic map zoom feedback")
+    if "candidate-group" not in app_text or "candidateRegion" not in app_text or "北海道以外的备选" not in app_text:
+        failures.append("the complete Candidate library is not grouped into user-facing regions")
+    if "data-quick-add-candidate" not in app_text or "data-assign-candidate" not in app_text or "assignCandidateToArea" not in app_text:
+        failures.append("candidate details do not offer a direct add-to-area workflow")
+    if "item.status" in app_text or "item.location?.scope" in app_text:
+        failures.append("internal research or coordinate status leaked into the user-facing Candidate detail")
     if "在 Google Maps 打开" in index_text + app_text or "google_maps_url" in app_text:
         failures.append("deferred Google Maps external-open feature was added")
     if "AutocompleteSuggestion.fetchAutocompleteSuggestions" not in app_text or "AutocompleteSessionToken" not in app_text:

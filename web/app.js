@@ -1,10 +1,12 @@
 const STORAGE_KEY = "hokkaido-trip-planner-v2";
 const state = {
   candidates: [], catalog: [], areas: [], view: "areas", selectedAreaId: null,
+  selectedCandidateId: null,
   expandedAreas: new Set(), showAreas: true, showCandidates: false,
   candidateQuery: "", candidateCategory: "", candidateUnassignedOnly: false,
   searchPreview: null, pickerAreaId: null, pickerSelection: new Set(), draggedAreaId: null,
   livePredictions: [], placesReady: false, searchSessionToken: null, searchRequestId: 0,
+  legendOpen: false,
 };
 const $ = id => document.getElementById(id);
 const CATEGORY_LABELS = {
@@ -30,6 +32,10 @@ function shown(value, fallback = "未研究") {
   if (Array.isArray(value)) return value.map(item => typeof item === "object" ? JSON.stringify(item) : item).join("；");
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
+}
+function known(value) { return !unknown(value); }
+function friendlyTiming(value) {
+  return ({ uncertain: "日期仍待确认", peak_window: "正值最佳时间", outside_best_window: "不在最佳时间", first_half: "行程前半段", second_half: "行程后半段", middle: "行程中段" })[value] || (value === "unknown" ? null : value);
 }
 function labelCategory(value) { return CATEGORY_LABELS[value] || value || "unknown"; }
 function validCoordinates(item) {
@@ -76,6 +82,31 @@ function initLeafletMap() {
   }).addTo(map);
   routeLayer = L.layerGroup().addTo(map); areaLayer = L.layerGroup().addTo(map);
   candidateLayer = L.layerGroup().addTo(map); previewLayer = L.layerGroup().addTo(map);
+}
+function shortSummary(item) {
+  const value = item.experience?.experience_summary || item.experience?.why_people_love_it;
+  return known(value) ? String(value) : "";
+}
+function candidateRegion(item) {
+  if (String(item.id).startsWith("JP-")) return "北海道以外的备选";
+  return item.region || item.municipality || "其他地区";
+}
+function focusMapAt(lat, lon, zoom = 13) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+  if (mapProvider === "google") {
+    map.panTo({ lat, lng: lon });
+    map.setZoom(zoom);
+  } else {
+    map.flyTo([lat, lon], zoom, { animate: true, duration: .45 });
+  }
+  setTimeout(() => { $("map").dataset.focusZoom = String(map.getZoom()); }, 550);
+}
+let toastTimer;
+function showToast(message) {
+  const toast = $("toast");
+  toast.textContent = message; toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.hidden = true; }, 2200);
 }
 async function initMap() {
   const googleMaps = await (window.googleMapsReady || Promise.resolve(null));
@@ -128,8 +159,10 @@ function googleAreaIcon(selected = false, muted = false) {
 }
 function renderLegend(items) {
   const categories = [...new Set(items.map(item => item.category))];
-  $("mapLegend").innerHTML = categories.map(category => `<div class="legend-item"><span class="type-dot" style="background:${COLORS[category]}"></span>${esc(labelCategory(category))}</div>`).join("");
-  $("mapLegend").hidden = !categories.length;
+  $("mapLegend").innerHTML = categories.map(category => `<button class="legend-item${state.candidateCategory === category ? " active" : ""}" data-map-category="${esc(category)}"><span class="type-dot" style="background:${COLORS[category]}"></span>${esc(labelCategory(category))}</button>`).join("");
+  $("mapLegend").hidden = !state.legendOpen || !categories.length;
+  $("toggleMapLegend").hidden = !state.showCandidates || !categories.length;
+  $("toggleMapLegend").setAttribute("aria-expanded", String(state.legendOpen));
 }
 function mapCandidates() {
   if (!state.showCandidates) return [];
@@ -172,43 +205,57 @@ function renderMap({ fit = false } = {}) {
   const visibleCandidates = mapCandidates();
   visibleCandidates.forEach(item => {
     const color = COLORS[item.category] || "#687d86";
+    const isSelected = item.id === state.selectedCandidateId;
     let marker;
     if (mapProvider === "google") {
       marker = new google.maps.Marker({
         position: { lat: item.location.lat, lng: item.location.lon }, map, title: item.name,
-        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: color, fillOpacity: .96, strokeColor: "#fff", strokeWeight: 2 },
+        zIndex: isSelected ? 1200 : 300,
+        icon: { path: google.maps.SymbolPath.CIRCLE, scale: isSelected ? 11 : 7, fillColor: color, fillOpacity: .96, strokeColor: "#fff", strokeWeight: isSelected ? 4 : 2 },
       });
-      marker.addListener("click", () => openCandidate(item.id)); candidateLayer.push(marker);
+      marker.addListener("click", () => focusCandidate(item.id)); candidateLayer.push(marker);
     } else {
-      marker = L.circleMarker([item.location.lat, item.location.lon], { radius: 7, color: "#fff", weight: 2, fillColor: color, fillOpacity: .96, className: "candidate-map-marker" });
-      marker.bindTooltip(item.name, { direction: "top" }); marker.on("click", () => openCandidate(item.id));
+      marker = L.circleMarker([item.location.lat, item.location.lon], { radius: isSelected ? 11 : 7, color: "#fff", weight: isSelected ? 4 : 2, fillColor: color, fillOpacity: .96, className: `candidate-map-marker${isSelected ? " is-selected" : ""}` });
+      marker.bindTooltip(item.name, { direction: "top" }); marker.on("click", () => focusCandidate(item.id));
       marker.addTo(candidateLayer);
+      const markerElement = marker.getElement();
+      if (markerElement) { markerElement.setAttribute("role", "button"); markerElement.setAttribute("aria-label", item.name); markerElement.setAttribute("tabindex", "0"); }
     }
     candidateMarkers.set(item.id, marker); points.push({ lat: item.location.lat, lng: item.location.lon });
   });
   renderLegend(visibleCandidates);
   if (fit) {
+    const libraryPoints = visibleCandidates.filter(item => !String(item.id).startsWith("JP-")).map(item => ({ lat: item.location.lat, lng: item.location.lon }));
+    const focusPoints = state.view === "candidates" && !selected && libraryPoints.length ? libraryPoints : points;
     if (mapProvider === "google") {
       if (selected && visibleCandidates.length === 0) { map.setCenter({ lat: selected.lat, lng: selected.lon }); map.setZoom(10); }
-      else if (points.length === 1) { map.setCenter(points[0]); map.setZoom(selected ? 11 : 8); }
-      else if (points.length > 1) {
-        const bounds = new google.maps.LatLngBounds(); points.forEach(point => bounds.extend(point)); map.fitBounds(bounds, 72);
+      else if (focusPoints.length === 1) { map.setCenter(focusPoints[0]); map.setZoom(selected ? 11 : 8); }
+      else if (focusPoints.length > 1) {
+        const bounds = new google.maps.LatLngBounds(); focusPoints.forEach(point => bounds.extend(point)); map.fitBounds(bounds, 72);
         google.maps.event.addListenerOnce(map, "idle", () => { const maxZoom = selected ? 12 : 9; if (map.getZoom() > maxZoom) map.setZoom(maxZoom); });
       } else { map.setCenter({ lat: 43.35, lng: 142.15 }); map.setZoom(6); }
     } else {
-      const leafletPoints = points.map(point => [point.lat, point.lng]);
+      const leafletPoints = focusPoints.map(point => [point.lat, point.lng]);
       if (selected && visibleCandidates.length === 0) map.setView([selected.lat, selected.lon], 10, { animate: true });
-      else if (points.length === 1) map.setView(leafletPoints[0], selected ? 11 : 8, { animate: true });
-      else if (points.length > 1) map.fitBounds(L.latLngBounds(leafletPoints).pad(.18), { maxZoom: selected ? 12 : 9, animate: true });
+      else if (focusPoints.length === 1) map.setView(leafletPoints[0], selected ? 11 : 8, { animate: true });
+      else if (focusPoints.length > 1) map.fitBounds(L.latLngBounds(leafletPoints).pad(.18), { maxZoom: selected ? 12 : 9, animate: true });
       else map.setView([43.35, 142.15], 6, { animate: true });
     }
   }
   renderMapFocusCard();
 }
 function renderMapFocusCard() {
+  const candidate = candidateById(state.selectedCandidateId);
+  if (candidate) {
+    const area = areaForCandidate(candidate.id);
+    $("mapFocusCard").innerHTML = `<div class="preview-top"><span class="focus-type-dot" style="background:${COLORS[candidate.category]}"></span><div class="preview-copy"><p class="preview-meta">当前候选地点</p><h3>${esc(candidate.name)}</h3><p>${esc(candidate.municipality || candidate.region || labelCategory(candidate.category))}</p></div></div><div class="focus-row"><span>${esc(labelCategory(candidate.category))}${area ? ` · ${esc(area.name)}` : ""}</span><button data-reopen-candidate="${esc(candidate.id)}">查看详情</button></div>`;
+    $("mapFocusCard").hidden = false;
+    return;
+  }
   const area = areaById(state.selectedAreaId);
   if (!area) { $("mapFocusCard").hidden = true; return; }
-  $("mapFocusCard").innerHTML = `<div class="preview-top"><div class="preview-symbol">⭐</div><div class="preview-copy"><p class="preview-meta">SELECTED AREA</p><h3>${esc(area.name)}</h3><p>${esc(area.address)}</p></div></div><div class="focus-row"><span>${area.candidateIds.length} Candidates · ${esc(area.startDate || "未定日期")}</span><button data-clear-area-focus>查看整个行程</button></div>`;
+  const previewNames = candidatesForArea(area.id).slice(0, 3).map(item => item.name).join("、");
+  $("mapFocusCard").innerHTML = `<div class="preview-top"><div class="preview-symbol">⭐</div><div class="preview-copy"><p class="preview-meta">当前行程地区</p><h3>${esc(area.name)}</h3><p>${esc(area.address)}</p></div></div>${previewNames ? `<p class="focus-candidate-preview">${esc(previewNames)}${area.candidateIds.length > 3 ? "…" : ""}</p>` : ""}<div class="focus-row"><span>${area.candidateIds.length} 个候选地点 · ${esc(area.startDate || "日期未定")}</span><button data-clear-area-focus>查看整个行程</button></div>`;
   $("mapFocusCard").hidden = false;
 }
 
@@ -219,17 +266,15 @@ function renderCounts() {
 }
 function areaCandidateRows(area) {
   const items = candidatesForArea(area.id);
-  if (!items.length) return '<div class="area-empty-candidates">这个地区还没有 Candidate</div>';
-  return items.map(item => `<div class="area-candidate-row"><span class="type-dot" style="background:${COLORS[item.category]}"></span><button data-open-candidate="${esc(item.id)}">${esc(item.name)}</button><button class="remove-mini" data-remove-candidate="${esc(item.id)}" data-area-id="${esc(area.id)}" aria-label="从地区移除">×</button></div>`).join("");
+  if (!items.length) return '<div class="area-empty-candidates"><strong>还没有候选地点</strong><span>点击下方按钮，从资料库中选择。</span></div>';
+  return items.map(item => `<div class="area-candidate-row${item.id === state.selectedCandidateId ? " selected" : ""}"><span class="type-dot" style="background:${COLORS[item.category]}"></span><button data-focus-candidate="${esc(item.id)}"><strong>${esc(item.name)}</strong><span>${esc(labelCategory(item.category))}</span></button><button class="remove-mini" data-remove-candidate="${esc(item.id)}" data-area-id="${esc(area.id)}" aria-label="从地区移除 ${esc(item.name)}">×</button></div>`).join("");
 }
 function renderAreaCard(area) {
   const selected = area.id === state.selectedAreaId; const expanded = state.expandedAreas.has(area.id);
   const dateLabel = area.startDate ? `${area.startDate}${area.endDate ? ` — ${area.endDate}` : ""}` : "日期未定";
   return `<article class="area-card${selected ? " selected" : ""}" data-area-card="${esc(area.id)}" draggable="true">
-    <div class="area-summary"><button class="drag-handle" aria-label="拖动调整顺序">⋮⋮</button><button class="area-main" data-select-area="${esc(area.id)}"><h3>${esc(area.name)}</h3><p>${esc(area.address)}</p></button><button class="area-star" data-select-area="${esc(area.id)}" aria-label="在地图查看">⭐</button></div>
-    <div class="area-quick-meta"><span>${esc(dateLabel)}</span>${area.nights ? `<span>${esc(area.nights)} 晚</span>` : ""}<span>${area.candidateIds.length} Candidates</span></div>
-    <div class="area-actions"><button class="candidate-toggle" data-toggle-area-candidates="${esc(area.id)}" aria-expanded="${expanded}"><span>查看 Candidates</span><span>${area.candidateIds.length}</span><span class="chevron">⌄</span></button><button class="icon-menu-button" data-toggle-area-editor="${esc(area.id)}" aria-label="编辑地区">•••</button></div>
-    ${expanded ? `<div class="area-expanded"><div class="area-candidates">${areaCandidateRows(area)}</div><button class="add-candidates-button" data-open-picker="${esc(area.id)}">＋ 添加 Candidates</button></div>` : ""}
+    <div class="area-summary"><button class="drag-handle" aria-label="拖动调整顺序">⋮⋮</button><button class="area-main" data-select-area="${esc(area.id)}"><span class="area-title-row"><span class="area-pin">⭐</span><h3>${esc(area.name)}</h3></span><p>${esc(area.address)}</p><span class="area-inline-meta">${esc(dateLabel)}${area.nights ? ` · ${esc(area.nights)} 晚` : ""} · ${area.candidateIds.length} 个地点</span></button><button class="candidate-toggle" data-toggle-area-candidates="${esc(area.id)}" aria-expanded="${expanded}" aria-label="${expanded ? "收起" : "展开"} ${esc(area.name)} 的候选地点"><span class="chevron">⌄</span></button></div>
+    ${expanded ? `<div class="area-expanded"><div class="area-expanded-heading"><span>候选地点</span><button class="icon-menu-button" data-toggle-area-editor="${esc(area.id)}">编辑地区</button></div><div class="area-candidates">${areaCandidateRows(area)}</div><button class="add-candidates-button" data-open-picker="${esc(area.id)}">＋ 添加候选地点</button></div>` : ""}
     ${selected && area.editing ? `<div class="area-editor"><label>地区名称<input data-area-field="name" data-area-id="${esc(area.id)}" value="${esc(area.name)}"></label><label>停留晚数<input type="number" min="0" data-area-field="nights" data-area-id="${esc(area.id)}" value="${esc(area.nights)}"></label><label>开始日期<input type="date" data-area-field="startDate" data-area-id="${esc(area.id)}" value="${esc(area.startDate)}"></label><label>结束日期<input type="date" data-area-field="endDate" data-area-id="${esc(area.id)}" value="${esc(area.endDate)}"></label><label class="wide">备注<textarea data-area-field="note" data-area-id="${esc(area.id)}">${esc(area.note)}</textarea></label><button class="delete-area" data-delete-area="${esc(area.id)}">移除这个地区</button></div>` : ""}
   </article>`;
 }
@@ -242,19 +287,33 @@ function filteredCandidates() {
 }
 function candidateCard(item) {
   const area = areaForCandidate(item.id);
-  return `<button class="candidate-card" data-open-candidate="${esc(item.id)}"><span class="type-dot" style="background:${COLORS[item.category]}"></span><div><h3>${esc(item.name)}</h3><p>${esc(labelCategory(item.category))} · ${esc(item.id)}</p><span class="area-label${area ? "" : " unassigned-label"}">${area ? esc(area.name) : "未归属"}</span></div></button>`;
+  const summary = shortSummary(item);
+  const duration = known(item.experience?.realistic_duration) ? String(item.experience.realistic_duration) : "";
+  return `<article class="candidate-card${item.id === state.selectedCandidateId ? " selected" : ""}" data-candidate-card="${esc(item.id)}"><button class="candidate-card-main" data-focus-candidate="${esc(item.id)}"><span class="type-dot" style="background:${COLORS[item.category]}"></span><span class="candidate-card-copy"><span class="candidate-name-row"><strong>${esc(item.name)}</strong>${area ? `<span class="area-label">${esc(area.name)}</span>` : ""}</span><span class="candidate-meta">${esc(labelCategory(item.category))}${duration ? ` · ${esc(duration)}` : ""}${item.municipality ? ` · ${esc(item.municipality)}` : ""}</span>${summary ? `<span class="candidate-summary">${esc(summary)}</span>` : ""}</span></button><button class="candidate-quick-add" data-quick-add-candidate="${esc(item.id)}">${area ? "更改地区" : "＋ 加入地区"}</button></article>`;
 }
-function renderCandidates() { const items = filteredCandidates(); $("candidateList").innerHTML = items.length ? items.map(candidateCard).join("") : '<div class="empty-state"><h3>没有符合筛选的 Candidate</h3></div>'; }
+function renderCategoryChips() {
+  const counts = new Map(); state.candidates.forEach(item => counts.set(item.category, (counts.get(item.category) || 0) + 1));
+  const chips = [["", "全部", state.candidates.length], ...Object.entries(CATEGORY_LABELS).map(([value,label]) => [value,label,counts.get(value) || 0])];
+  $("candidateCategoryChips").innerHTML = chips.map(([value,label,count]) => `<button data-category-chip="${esc(value)}" class="category-chip${state.candidateCategory === value ? " active" : ""}"><span${value ? ` class="type-dot" style="background:${COLORS[value]}"` : ""}></span>${esc(label)} <small>${count}</small></button>`).join("");
+}
+function renderCandidates() {
+  const items = filteredCandidates();
+  renderCategoryChips();
+  if (!items.length) { $("candidateList").innerHTML = '<div class="empty-state"><h3>没有符合筛选的候选地点</h3></div>'; return; }
+  const groups = new Map();
+  items.forEach(item => { const group = candidateRegion(item); if (!groups.has(group)) groups.set(group, []); groups.get(group).push(item); });
+  $("candidateList").innerHTML = [...groups.entries()].map(([group,rows]) => `<section class="candidate-group"><div class="candidate-group-heading"><h3>${esc(group)}</h3><span>${rows.length}</span></div>${rows.map(candidateCard).join("")}</section>`).join("");
+}
 function renderAll({ fitMap = false } = {}) { renderCounts(); renderAreas(); renderCandidates(); renderMap({ fit: fitMap }); updateLayerButtons(); }
 
 function selectArea(id) {
-  if (!areaById(id)) return; state.selectedAreaId = id; state.showAreas = true; state.showCandidates = true;
+  if (!areaById(id)) return; state.selectedAreaId = id; state.selectedCandidateId = null; state.showAreas = true; state.showCandidates = true;
   saveUserState(); renderAll({ fitMap: true });
 }
-function clearAreaFocus() { state.selectedAreaId = null; state.showCandidates = state.view === "candidates"; saveUserState(); renderAll({ fitMap: true }); }
+function clearAreaFocus() { state.selectedAreaId = null; state.selectedCandidateId = null; state.showCandidates = state.view === "candidates"; saveUserState(); renderAll({ fitMap: true }); }
 function deleteArea(id) { state.areas = state.areas.filter(area => area.id !== id); if (state.selectedAreaId === id) state.selectedAreaId = null; state.expandedAreas.delete(id); saveUserState(); renderAll({ fitMap: true }); }
 function removeCandidateFromArea(areaId, candidateId) { const area = areaById(areaId); if (!area) return; area.candidateIds = area.candidateIds.filter(id => id !== candidateId); saveUserState(); renderAll({ fitMap: true }); }
-function updateLayerButtons() { $("toggleAreaLayer").classList.toggle("active", state.showAreas); $("toggleCandidateLayer").classList.toggle("active", state.showCandidates); }
+function updateLayerButtons() { $("toggleAreaLayer").classList.toggle("active", state.showAreas); $("toggleCandidateLayer").classList.toggle("active", state.showCandidates); $("toggleMapLegend").classList.toggle("active", state.legendOpen); }
 
 function catalogMatches(query) {
   const value = query.trim().toLowerCase(); if (!value) return [];
@@ -336,7 +395,7 @@ async function previewLivePlace(index) {
 function showPlacePreview(place) {
   state.searchPreview = place; $("areaSearchResults").hidden = true; $("mapFocusCard").hidden = true;
   const existing = state.areas.find(area => area.placeId === place.place_id);
-  $("placePreview").innerHTML = `<div class="preview-top"><div class="preview-symbol">⌖</div><div class="preview-copy"><p class="preview-meta">GOOGLE MAPS · CITY / AREA</p><h3>${esc(place.name_zh)}</h3><p>${esc(place.formatted_address)}</p></div></div><div class="preview-actions"><button class="primary-button" data-add-preview-place>${existing ? "查看已加入地区" : "加入行程 ⭐"}</button><button class="secondary-button" data-dismiss-preview>取消</button></div>`;
+  $("placePreview").innerHTML = `<div class="preview-top"><div class="preview-symbol">⌖</div><div class="preview-copy"><p class="preview-meta">Google Maps 地区</p><h3>${esc(place.name_zh)}</h3><p>${esc(place.formatted_address)}</p></div></div><div class="preview-actions"><button class="primary-button" data-add-preview-place>${existing ? "查看已加入地区" : "加入行程 ⭐"}</button><button class="secondary-button" data-dismiss-preview>取消</button></div>`;
   $("placePreview").hidden = false; clearMapLayer(previewLayer);
   if (mapProvider === "google") {
     const marker = new google.maps.Marker({
@@ -373,7 +432,7 @@ function pickerCandidates() {
 }
 function renderPicker() {
   const items = pickerCandidates();
-  $("pickerCandidateList").innerHTML = items.length ? items.map(item => { const current = areaForCandidate(item.id); return `<label class="picker-row"><input type="checkbox" value="${esc(item.id)}"${state.pickerSelection.has(item.id) ? " checked" : ""}><span class="type-dot" style="background:${COLORS[item.category]}"></span><span><h3>${esc(item.name)}</h3><p>${esc(labelCategory(item.category))}${current ? ` · 当前：${esc(current.name)}` : " · 未归属"}</p></span></label>`; }).join("") : '<div class="empty-state"><h3>没有符合筛选的 Candidate</h3></div>';
+  $("pickerCandidateList").innerHTML = items.length ? items.map(item => { const current = areaForCandidate(item.id); return `<label class="picker-row"><input type="checkbox" value="${esc(item.id)}"${state.pickerSelection.has(item.id) ? " checked" : ""}><span class="type-dot" style="background:${COLORS[item.category]}"></span><span><h3>${esc(item.name)}</h3><p>${esc(labelCategory(item.category))}${item.municipality ? ` · ${esc(item.municipality)}` : ""}${current ? ` · 当前：${esc(current.name)}` : ""}</p></span></label>`; }).join("") : '<div class="empty-state"><h3>没有符合筛选的候选地点</h3></div>';
   $("pickerSelectionCount").textContent = `已选择 ${state.pickerSelection.size}`;
 }
 function savePicker() {
@@ -381,25 +440,55 @@ function savePicker() {
   const moved = [...state.pickerSelection].map(id => ({ id, area: areaForCandidate(id) })).filter(row => row.area && row.area.id !== target.id);
   if (moved.length && !window.confirm(`${moved.length} 个 Candidate 已属于其他地区。确认移动到“${target.name}”吗？`)) return;
   state.areas.forEach(area => { if (area.id !== target.id) area.candidateIds = area.candidateIds.filter(id => !state.pickerSelection.has(id)); });
-  target.candidateIds = [...state.pickerSelection]; state.expandedAreas.add(target.id); saveUserState(); closePicker(); renderAll({ fitMap: true });
+  target.candidateIds = [...state.pickerSelection]; state.expandedAreas.clear(); state.expandedAreas.add(target.id); saveUserState(); closePicker(); renderAll({ fitMap: true }); showToast(`已更新 ${target.name} 的候选地点`);
 }
 
-function displayList(items, emptyText = "未研究") { return Array.isArray(items) && items.length ? `<ul class="research-list">${items.map(item => `<li>${esc(shown(item))}</li>`).join("")}</ul>` : `<p class="unknown-value">${esc(emptyText)}</p>`; }
-function dl(rows) { return `<dl>${rows.map(([key,value]) => `<dt>${esc(key)}</dt><dd>${esc(shown(value))}</dd>`).join("")}</dl>`; }
-function infoSection(title, content) { return `<section class="detail-section"><h3>${esc(title)}</h3>${content}</section>`; }
+function displayList(items) { return Array.isArray(items) && items.length ? `<ul class="research-list">${items.map(item => `<li>${esc(shown(item))}</li>`).join("")}</ul>` : ""; }
+function dl(rows) { const knownRows = rows.filter(([,value]) => known(value)); return knownRows.length ? `<dl>${knownRows.map(([key,value]) => `<dt>${esc(key)}</dt><dd>${esc(shown(value))}</dd>`).join("")}</dl>` : ""; }
+function infoSection(title, content) { return content ? `<section class="detail-section"><h3>${esc(title)}</h3>${content}</section>` : ""; }
 function renderVisualEvidence(item) {
   const assets = item.visual?.assets || [];
-  if (!assets.length) return '<div class="photo-placeholder"><p>尚无已研究视觉证据</p></div>';
+  if (!assets.length) return "";
   return `<div class="gallery">${assets.map(asset => { const url = asset.asset_url || asset.source_page_url; return `<figure>${asset.asset_url ? `<img src="${esc(asset.asset_url)}" alt="${esc(asset.caption || item.name)}" loading="lazy">` : '<div class="photo-placeholder">VISUAL SOURCE</div>'}<figcaption>${esc(shown(asset.what_this_image_is_showing || asset.caption))}</figcaption></figure>`; }).join("")}</div>`;
 }
+function renderDetailAreaAction(item) {
+  const current = areaForCandidate(item.id);
+  if (!state.areas.length) return `<div class="detail-area-action"><div><strong>加入行程地区</strong><span>先在地图上搜索并添加一个市或地区。</span></div><button class="primary-button" data-go-to-areas>添加地区</button></div>`;
+  const options = state.areas.map(area => `<option value="${esc(area.id)}"${current?.id === area.id ? " selected" : ""}>${esc(area.name)}</option>`).join("");
+  return `<div class="detail-area-action"><label><strong>${current ? "更改所属地区" : "加入行程地区"}</strong><select id="detailAreaSelect"><option value="">请选择地区</option>${options}</select></label><button class="primary-button" data-assign-candidate="${esc(item.id)}">${current ? "更新地区" : "加入地区"}</button></div>`;
+}
+function renderCandidateDetail(item) {
+  const area = areaForCandidate(item.id); const position = item.temporal?.trip_window_position || {};
+  const altNames = [item.names?.ja, item.names?.en].filter(known).map(esc).join(" · ");
+  const preview = dl([["体验概览",item.experience?.experience_summary],["值得去的原因",item.experience?.why_people_love_it]]);
+  const tripExperience = dl([["9 月旅行体验",item.experience?.sep_2026_experience],["时间窗口",friendlyTiming(item.experience?.trip_window_fit)],["建议行程阶段",friendlyTiming(position.preferred_trip_segment)]]);
+  const practical = dl([["建议停留时间",item.experience?.realistic_duration],["天气影响",item.experience?.weather_dependency],["体力要求",item.experience?.physical_load],["所在市町",item.municipality]]);
+  const disappointment = known(item.experience?.common_disappointments) ? `<p>${esc(shown(item.experience.common_disappointments))}</p>` : "";
+  $("detailContent").innerHTML = `<header class="detail-hero"><span class="detail-category" style="--category-color:${COLORS[item.category]}">${esc(labelCategory(item.category))}</span><h2>${esc(item.name)}</h2>${altNames ? `<p class="alt-names">${altNames}</p>` : ""}</header>${renderDetailAreaAction(item)}<div class="detail-body"><div class="detail-tags">${area ? `<span class="detail-tag">已加入 ${esc(area.name)}</span>` : `<span class="detail-tag neutral">尚未加入地区</span>`}${item.municipality ? `<span class="detail-tag neutral">${esc(item.municipality)}</span>` : ""}</div>${infoSection("30 秒了解", preview)}${infoSection("实际会做什么", displayList(item.experience?.what_you_actually_do))}${infoSection("9 月 5–18 日体验", tripExperience)}${infoSection("实用信息", practical)}${infoSection("可能失望之处", disappointment)}${infoSection("视觉资料",renderVisualEvidence(item))}</div>`;
+}
 function openCandidate(id) {
-  const item = candidateById(id); if (!item) return; const area = areaForCandidate(id); const position = item.temporal?.trip_window_position || {};
-  $("detailContent").innerHTML = `<header class="detail-hero"><p class="eyebrow">${esc(item.id)}</p><h2>${esc(item.name)}</h2><p class="alt-names">${esc(item.names?.ja || "")}<br>${esc(item.names?.en || "")}</p></header><div class="detail-body"><div class="detail-tags"><span class="detail-tag">${esc(labelCategory(item.category))}</span><span class="detail-tag">${area ? esc(area.name) : "未归属"}</span><span class="detail-tag">${esc(item.status)}</span></div>${infoSection("30 秒预览", dl([["Experience summary",item.experience?.experience_summary],["Why people love it",item.experience?.why_people_love_it],["Trip-window fit",item.experience?.trip_window_fit]]))}${infoSection("实际会做什么", displayList(item.experience?.what_you_actually_do,"尚未完成 L1 行为步骤研究"))}${infoSection("9/5–9/18 实际体验", dl([["Sep 2026 experience",item.experience?.sep_2026_experience],["Trip-window position",position.position],["Preferred segment",position.preferred_trip_segment]]))}${infoSection("Practical", dl([["Realistic duration",item.experience?.realistic_duration],["Weather dependency",item.experience?.weather_dependency],["Physical load",item.experience?.physical_load],["Municipality",item.municipality],["Coordinate scope",item.location?.scope]]))}${infoSection("可能失望之处", `<p>${esc(shown(item.experience?.common_disappointments))}</p>`)}${infoSection("Visual evidence",renderVisualEvidence(item))}${infoSection("研究缺口",displayList([...(item.uncertainties||[]),...(item.dynamicRechecks||[]),...(item.level2Attention||[])],"尚未记录明确研究缺口"))}</div>`;
-  $("detailDialog").showModal();
+  const item = candidateById(id); if (!item) return;
+  renderCandidateDetail(item);
+  if (!$("detailDialog").open) $("detailDialog").showModal();
+}
+function focusCandidate(id, { showDetails = true } = {}) {
+  const item = candidateById(id); if (!item) return;
+  state.selectedCandidateId = id; state.showCandidates = true;
+  renderAll();
+  if (validCoordinates(item)) focusMapAt(item.location.lat, item.location.lon, 13);
+  if (showDetails) openCandidate(id);
+}
+function assignCandidateToArea(candidateId, areaId) {
+  const item = candidateById(candidateId); const target = areaById(areaId); if (!item) return; if (!target) return showToast("请先选择一个地区");
+  state.areas.forEach(area => { area.candidateIds = area.candidateIds.filter(id => id !== candidateId); });
+  target.candidateIds.push(candidateId);
+  state.selectedAreaId = target.id; state.selectedCandidateId = candidateId; state.expandedAreas.add(target.id); state.showCandidates = true;
+  saveUserState(); renderAll(); focusMapAt(item.location?.lat, item.location?.lon, 13); renderCandidateDetail(item);
+  showToast(`已把“${item.name}”加入 ${target.name}`);
 }
 
 function switchView(view) {
-  state.view = view; document.querySelectorAll(".panel-tab").forEach(tab => tab.classList.toggle("active", tab.dataset.view === view));
+  state.view = view; state.selectedCandidateId = null; document.querySelectorAll(".panel-tab").forEach(tab => tab.classList.toggle("active", tab.dataset.view === view));
   $("areasView").classList.toggle("active", view === "areas"); $("candidatesView").classList.toggle("active", view === "candidates");
   if (view === "candidates") { state.selectedAreaId = null; state.showCandidates = true; } else if (!state.selectedAreaId) state.showCandidates = false;
   renderAll({ fitMap: true });
@@ -416,16 +505,18 @@ function setupInteractions() {
     if (catalogButton) previewPlace(catalogButton.dataset.previewPlace);
   });
   $("placePreview").addEventListener("click", event => { if (event.target.closest("[data-add-preview-place]")) addPreviewPlace(); if (event.target.closest("[data-dismiss-preview]")) dismissPreview(); });
-  $("mapFocusCard").addEventListener("click", event => { if (event.target.closest("[data-clear-area-focus]")) clearAreaFocus(); });
+  $("mapFocusCard").addEventListener("click", event => { if (event.target.closest("[data-clear-area-focus]")) clearAreaFocus(); const reopen = event.target.closest("[data-reopen-candidate]"); if (reopen) openCandidate(reopen.dataset.reopenCandidate); });
   $("toggleAreaLayer").addEventListener("click", () => { state.showAreas = !state.showAreas; renderMap(); updateLayerButtons(); });
   $("toggleCandidateLayer").addEventListener("click", () => { state.showCandidates = !state.showCandidates; renderMap({ fit: state.showCandidates }); updateLayerButtons(); });
+  $("toggleMapLegend").addEventListener("click", () => { state.legendOpen = !state.legendOpen; renderMap(); updateLayerButtons(); });
+  $("mapLegend").addEventListener("click", event => { const button = event.target.closest("[data-map-category]"); if (!button) return; state.candidateCategory = state.candidateCategory === button.dataset.mapCategory ? "" : button.dataset.mapCategory; renderCandidates(); renderCounts(); renderMap({ fit: true }); });
   $("areaList").addEventListener("click", event => {
     const select = event.target.closest("[data-select-area]"); if (select) return selectArea(select.dataset.selectArea);
-    const toggle = event.target.closest("[data-toggle-area-candidates]"); if (toggle) { const id = toggle.dataset.toggleAreaCandidates; state.expandedAreas.has(id) ? state.expandedAreas.delete(id) : state.expandedAreas.add(id); if (state.selectedAreaId !== id) state.selectedAreaId = id; state.showCandidates = true; saveUserState(); return renderAll({ fitMap: true }); }
+    const toggle = event.target.closest("[data-toggle-area-candidates]"); if (toggle) { const id = toggle.dataset.toggleAreaCandidates; if (state.expandedAreas.has(id)) state.expandedAreas.delete(id); else { state.expandedAreas.clear(); state.expandedAreas.add(id); } state.selectedAreaId = id; state.selectedCandidateId = null; state.showCandidates = true; saveUserState(); return renderAll({ fitMap: true }); }
     const edit = event.target.closest("[data-toggle-area-editor]"); if (edit) { const area = areaById(edit.dataset.toggleAreaEditor); if (area) { area.editing = !area.editing; state.selectedAreaId = area.id; renderAreas(); } return; }
     const picker = event.target.closest("[data-open-picker]"); if (picker) return openPicker(picker.dataset.openPicker);
     const remove = event.target.closest("[data-remove-candidate]"); if (remove) return removeCandidateFromArea(remove.dataset.areaId, remove.dataset.removeCandidate);
-    const open = event.target.closest("[data-open-candidate]"); if (open) return openCandidate(open.dataset.openCandidate);
+    const focus = event.target.closest("[data-focus-candidate]"); if (focus) return focusCandidate(focus.dataset.focusCandidate);
     const del = event.target.closest("[data-delete-area]"); if (del) return deleteArea(del.dataset.deleteArea);
   });
   $("areaList").addEventListener("input", event => { const field = event.target.dataset.areaField; const area = areaById(event.target.dataset.areaId); if (field && area) { area[field] = event.target.value; saveUserState(); if (field === "name") renderMapFocusCard(); renderCounts(); } });
@@ -433,9 +524,9 @@ function setupInteractions() {
   $("areaList").addEventListener("dragend", event => { event.target.closest("[data-area-card]")?.classList.remove("dragging"); state.draggedAreaId = null; });
   $("areaList").addEventListener("dragover", event => event.preventDefault());
   $("areaList").addEventListener("drop", event => { event.preventDefault(); const target = event.target.closest("[data-area-card]")?.dataset.areaCard; if (!target || !state.draggedAreaId || target === state.draggedAreaId) return; const from = state.areas.findIndex(area => area.id === state.draggedAreaId); const to = state.areas.findIndex(area => area.id === target); const [moved] = state.areas.splice(from,1); state.areas.splice(to,0,moved); saveUserState(); renderAll({ fitMap: true }); });
-  $("candidateList").addEventListener("click", event => { const button = event.target.closest("[data-open-candidate]"); if (button) openCandidate(button.dataset.openCandidate); });
-  $("candidateSearch").addEventListener("input", event => { state.candidateQuery = event.target.value; renderCandidates(); renderCounts(); if (state.view === "candidates") renderMap(); });
-  $("candidateCategory").addEventListener("change", event => { state.candidateCategory = event.target.value; renderCandidates(); renderCounts(); if (state.view === "candidates") renderMap({fit:true}); });
+  $("candidateList").addEventListener("click", event => { const focus = event.target.closest("[data-focus-candidate]"); if (focus) return focusCandidate(focus.dataset.focusCandidate); const add = event.target.closest("[data-quick-add-candidate]"); if (add) return focusCandidate(add.dataset.quickAddCandidate); });
+  $("candidateCategoryChips").addEventListener("click", event => { const chip = event.target.closest("[data-category-chip]"); if (!chip) return; state.candidateCategory = chip.dataset.categoryChip; renderCandidates(); renderCounts(); if (state.view === "candidates") renderMap({fit:true}); });
+  $("candidateSearch").addEventListener("input", event => { state.candidateQuery = event.target.value; renderCandidates(); renderCounts(); if (state.view === "candidates") renderMap({fit:true}); });
   $("candidateUnassignedOnly").addEventListener("change", event => { state.candidateUnassignedOnly = event.target.checked; renderCandidates(); renderCounts(); if (state.view === "candidates") renderMap({fit:true}); });
   $("closePicker").addEventListener("click", closePicker); $("drawerScrim").addEventListener("click", closePicker);
   ["pickerSearch","pickerCategory","pickerUnassignedOnly"].forEach(id => $(id).addEventListener(id === "pickerSearch" ? "input" : "change", renderPicker));
@@ -443,6 +534,11 @@ function setupInteractions() {
   $("selectAllPicker").addEventListener("click", () => { pickerCandidates().forEach(item => state.pickerSelection.add(item.id)); renderPicker(); });
   $("savePicker").addEventListener("click", savePicker);
   $("closeDetail").addEventListener("click", () => $("detailDialog").close());
+  $("detailContent").addEventListener("click", event => {
+    const assign = event.target.closest("[data-assign-candidate]");
+    if (assign) return assignCandidateToArea(assign.dataset.assignCandidate, $("detailAreaSelect")?.value);
+    if (event.target.closest("[data-go-to-areas]")) { $("detailDialog").close(); switchView("areas"); $("areaSearch").focus(); }
+  });
 }
 
 async function boot() {
@@ -451,7 +547,7 @@ async function boot() {
     const responses = await Promise.all(paths.map(path => fetch(path))); if (responses.some(response => !response.ok)) throw new Error("数据文件无法读取");
     const [master,locations,batches,catalog] = await Promise.all(responses.map(response => response.json()));
     state.candidates = window.ResearchDataAdapter.buildCandidateViewModels(master,locations,batches); state.catalog = catalog.places || [];
-    loadUserState(); fillCategorySelect($("candidateCategory")); fillCategorySelect($("pickerCategory")); await initMap(); setupInteractions(); renderAll({ fitMap: true });
+    loadUserState(); fillCategorySelect($("pickerCategory")); await initMap(); setupInteractions(); renderAll({ fitMap: true });
   } catch (error) {
     $("areaList").innerHTML = `<div class="empty-state"><h3>无法载入地图数据</h3><p>${esc(error.message)}</p></div>`;
   }
