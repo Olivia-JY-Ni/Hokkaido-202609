@@ -32,14 +32,21 @@
 (() => {
   const css = document.createElement("link");
   css.rel = "stylesheet";
-  css.href = "planner-enhancements.css?v=20260811-1";
+  css.href = "planner-enhancements.css?v=20260811-2";
   document.head.append(css);
 
   window.addEventListener("load", () => {
-    if (document.querySelector('script[data-planner-enhancements]')) return;
-    const script = document.createElement("script");
-    script.src = "planner-enhancements.js?v=20260811-1";
-    script.dataset.plannerEnhancements = "true";
-    document.body.append(script);
+    if (!document.querySelector('script[data-planner-enhancements]')) {
+      const planner = document.createElement("script");
+      planner.src = "planner-enhancements.js?v=20260811-2";
+      planner.dataset.plannerEnhancements = "true";
+      document.body.append(planner);
+    }
+    if (!document.querySelector('script[data-planner-custom-types]')) {
+      const types = document.createElement("script");
+      types.src = "planner-custom-types.js?v=20260811-2";
+      types.dataset.plannerCustomTypes = "true";
+      document.body.append(types);
+    }
   }, { once: true });
 })();
