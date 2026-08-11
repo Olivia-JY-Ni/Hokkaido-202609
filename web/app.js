@@ -350,7 +350,7 @@ function renderMapFocusCard() {
   const candidate = candidateById(state.selectedCandidateId);
   if (candidate) {
     const area = areaForCandidate(candidate.id);
-    $("mapFocusCard").innerHTML = `<div class="preview-top"><span class="focus-type-dot" style="background:${COLORS[candidate.category]}"></span><div class="preview-copy"><p class="preview-meta">当前候选地点</p><h3>${esc(candidate.name)}</h3><p>${esc(candidate.municipality || candidate.region || labelCategory(candidate.category))}</p></div></div><div class="focus-row"><span>${esc(labelCategory(candidate.category))}${area ? ` · ${esc(area.name)}` : ""}</span><button data-reopen-candidate="${esc(candidate.id)}">查看详情</button></div>`;
+    $("mapFocusCard").innerHTML = `<div class="preview-top"><span class="focus-type-dot" style="background:${COLORS[candidate.category]}"></span><div class="preview-copy"><p class="preview-meta">当前候选地点</p><h3>${esc(candidate.name)}</h3><p>${esc(candidate.municipality || candidate.region || labelCategory(candidate.category))}</p></div></div>${validCoordinates(candidate) ? `<div class="route-quick-actions"><button class="route-to-button" data-plan-route-to-candidate="${esc(candidate.id)}"><span>↗</span>到这里</button><button class="route-from-button" data-plan-route-from-candidate="${esc(candidate.id)}"><span>↘</span>从这里出发</button></div>` : ""}<div class="focus-row"><span>${esc(labelCategory(candidate.category))}${area ? ` · ${esc(area.name)}` : ""}</span><button data-reopen-candidate="${esc(candidate.id)}">查看详情</button></div>`;
     $("mapFocusCard").hidden = false;
     return;
   }
@@ -358,7 +358,7 @@ function renderMapFocusCard() {
   if (!area) { $("mapFocusCard").hidden = true; return; }
   const previewNames = candidatesForArea(area.id).slice(0, 3).map(item => item.name).join("、");
   const status = labelBusinessStatus(area.businessStatus);
-  $("mapFocusCard").innerHTML = `<div class="preview-top"><div class="preview-symbol">⭐</div><div class="preview-copy"><p class="preview-meta">当前行程地区</p><h3>${esc(area.name)}</h3><p>${esc(area.address)}</p>${status ? `<span class="place-status">${esc(status)}</span>` : ""}</div></div>${previewNames ? `<p class="focus-candidate-preview">${esc(previewNames)}${area.candidateIds.length > 3 ? "…" : ""}</p>` : ""}<div class="focus-actions"><button class="primary-button" data-explore-nearby="${esc(area.id)}">探索周边</button><button class="secondary-button" data-refresh-area="${esc(area.id)}">更新地点资料</button></div><div class="focus-row"><span>${area.candidateIds.length} 个候选地点 · ${esc(area.startDate || "日期未定")}</span><button data-clear-area-focus>查看整个行程</button></div>`;
+  $("mapFocusCard").innerHTML = `<div class="preview-top"><div class="preview-symbol">⭐</div><div class="preview-copy"><p class="preview-meta">当前行程地区</p><h3>${esc(area.name)}</h3><p>${esc(area.address)}</p>${status ? `<span class="place-status">${esc(status)}</span>` : ""}</div></div>${previewNames ? `<p class="focus-candidate-preview">${esc(previewNames)}${area.candidateIds.length > 3 ? "…" : ""}</p>` : ""}<div class="route-quick-actions"><button class="route-to-button" data-plan-route-to-area="${esc(area.id)}"><span>↗</span>到这里</button><button class="route-from-button" data-plan-route-from-area="${esc(area.id)}"><span>↘</span>从这里出发</button></div><div class="focus-actions focus-tool-actions"><button class="secondary-button" data-explore-nearby="${esc(area.id)}">探索周边</button><button class="secondary-button" data-refresh-area="${esc(area.id)}">更新地点资料</button></div><div class="focus-row"><span>${area.candidateIds.length} 个候选地点 · ${esc(area.startDate || "日期未定")}</span><button data-clear-area-focus>查看整个行程</button></div>`;
   $("mapFocusCard").hidden = false;
 }
 
@@ -397,7 +397,7 @@ function candidateCard(item) {
   const area = areaForCandidate(item.id);
   const summary = shortSummary(item);
   const duration = known(item.experience?.realistic_duration) ? String(item.experience.realistic_duration) : "";
-  return `<article class="candidate-card${item.id === state.selectedCandidateId ? " selected" : ""}" data-candidate-card="${esc(item.id)}"><button class="candidate-card-main" data-focus-candidate="${esc(item.id)}"><span class="type-dot" style="background:${COLORS[item.category]}"></span><span class="candidate-card-copy"><span class="candidate-name-row"><strong>${esc(item.name)}</strong>${area ? `<span class="area-label">${esc(area.name)}</span>` : ""}</span><span class="candidate-meta">${esc(labelCategory(item.category))}${duration ? ` · ${esc(duration)}` : ""}${item.municipality ? ` · ${esc(item.municipality)}` : ""}</span>${summary ? `<span class="candidate-summary">${esc(summary)}</span>` : ""}</span></button><div class="candidate-card-actions"><button data-open-candidate-detail="${esc(item.id)}">详情</button><button class="candidate-quick-add" data-quick-add-candidate="${esc(item.id)}">${area ? "更改地区" : "＋ 加入地区"}</button></div></article>`;
+  return `<article class="candidate-card${item.id === state.selectedCandidateId ? " selected" : ""}" data-candidate-card="${esc(item.id)}"><button class="candidate-card-main" data-focus-candidate="${esc(item.id)}"><span class="type-dot" style="background:${COLORS[item.category]}"></span><span class="candidate-card-copy"><span class="candidate-name-row"><strong>${esc(item.name)}</strong>${area ? `<span class="area-label">${esc(area.name)}</span>` : ""}</span><span class="candidate-meta">${esc(labelCategory(item.category))}${duration ? ` · ${esc(duration)}` : ""}${item.municipality ? ` · ${esc(item.municipality)}` : ""}</span>${summary ? `<span class="candidate-summary">${esc(summary)}</span>` : ""}</span></button><div class="candidate-card-actions">${validCoordinates(item) ? `<button data-plan-route-to-candidate="${esc(item.id)}">路线</button>` : ""}<button data-open-candidate-detail="${esc(item.id)}">详情</button><button class="candidate-quick-add" data-quick-add-candidate="${esc(item.id)}">${area ? "更改地区" : "＋ 加入地区"}</button></div></article>`;
 }
 function renderCategoryChips() {
   const counts = new Map(); state.candidates.forEach(item => counts.set(item.category, (counts.get(item.category) || 0) + 1));
@@ -439,6 +439,25 @@ function endpointFromArea(area) {
 function endpointFromCandidate(item) {
   return { source: "candidate", sourceId: item.id, placeId: item.location?.provider_place_id || `local-${item.id}`, name: item.name,
     address: [item.municipality,item.region].filter(Boolean).join(" · "), lat: item.location.lat, lon: item.location.lon };
+}
+function endpointFromSearchPlace(place) {
+  return { source: "google", sourceId: place.place_id, placeId: place.place_id, name: place.name_zh,
+    address: place.formatted_address || "", lat: place.lat, lon: place.lon };
+}
+function launchRoutePlanner(endpoint, target = "destination") {
+  if (!endpoint || !Number.isFinite(endpoint.lat) || !Number.isFinite(endpoint.lon)) return showToast("这个地点暂时没有可用坐标");
+  const previous = state.routeDraft;
+  state.activeSavedRouteId = null; state.routeOptions = []; state.routeStatus = "idle"; state.selectedRouteOption = 0; state.routeDetailsOpen = new Set();
+  state.routeDraft = { origin: null, destination: null, travelMode: previous.travelMode || "TRANSIT", timeMode: previous.timeMode || "departure",
+    dateTime: previous.dateTime || "2026-09-05T09:00", transitModes: [...(previous.transitModes || [])], transitPreference: previous.transitPreference || "" };
+  state.routeDraft[target] = structuredClone(endpoint);
+  state.searchPreview = null; $("placePreview").hidden = true; clearMapLayer(previewLayer); $("customRoutePanel").hidden = true;
+  if ($("detailDialog").open) $("detailDialog").close();
+  if (state.nearbyAreaId) closeNearby();
+  $("routeTitle").value = ""; $("routeManualCost").value = ""; $("routeNotes").value = ""; syncRouteForm(); switchView("routes");
+  const missingTarget = target === "destination" ? "origin" : "destination";
+  setTimeout(() => { const input = routeEndpointInput(missingTarget); input.focus(); input.select(); }, 80);
+  showToast(`已把“${endpoint.name}”设为${target === "destination" ? "终点" : "起点"}，请选择${target === "destination" ? "出发地" : "目的地"}`);
 }
 function localRouteEndpointMatches(query) {
   const value = query.trim().toLowerCase(); if (!value) return [];
@@ -941,7 +960,7 @@ function showPlacePreview(place) {
   state.searchPreview = place; $("areaSearchResults").hidden = true; $("mapFocusCard").hidden = true;
   const existing = state.areas.find(area => area.placeId === place.place_id);
   const status = labelBusinessStatus(place.business_status);
-  $("placePreview").innerHTML = `<div class="preview-top"><div class="preview-symbol">⌖</div><div class="preview-copy"><p class="preview-meta">Google Maps 地点 / 地区</p><h3>${esc(place.name_zh)}</h3><p>${esc(place.formatted_address)}</p><div class="place-preview-meta">${place.place_type ? `<span>${esc(place.place_type)}</span>` : ""}${status ? `<span>${esc(status)}</span>` : ""}</div></div></div><div class="preview-actions"><button class="primary-button" data-add-preview-place>${existing ? "查看已加入地点" : "加入行程 ⭐"}</button><button class="secondary-button" data-dismiss-preview>取消</button></div>`;
+  $("placePreview").innerHTML = `<div class="preview-top"><div class="preview-symbol">⌖</div><div class="preview-copy"><p class="preview-meta">Google Maps 地点 / 地区</p><h3>${esc(place.name_zh)}</h3><p>${esc(place.formatted_address)}</p><div class="place-preview-meta">${place.place_type ? `<span>${esc(place.place_type)}</span>` : ""}${status ? `<span>${esc(status)}</span>` : ""}</div></div></div><div class="route-quick-actions"><button class="route-to-button" data-plan-route-to-preview><span>↗</span>到这里</button><button class="route-from-button" data-plan-route-from-preview><span>↘</span>从这里出发</button></div><div class="preview-actions preview-secondary-actions"><button class="secondary-button" data-add-preview-place>${existing ? "查看已加入地点" : "加入行程 ⭐"}</button><button class="text-button" data-dismiss-preview>取消</button></div>`;
   $("placePreview").hidden = false; clearMapLayer(previewLayer);
   if (mapProvider === "google") {
     const marker = new google.maps.Marker({
@@ -1042,6 +1061,10 @@ function renderDetailAreaAction(item) {
   const options = state.areas.map(area => `<option value="${esc(area.id)}"${current?.id === area.id ? " selected" : ""}>${esc(area.name)}</option>`).join("");
   return `<div class="detail-area-action"><label><strong>${current ? "更改所属地区" : "加入行程地区"}</strong><select id="detailAreaSelect"><option value="">请选择地区</option>${options}</select></label><button class="primary-button" data-assign-candidate="${esc(item.id)}">${current ? "更新地区" : "加入地区"}</button></div>`;
 }
+function renderDetailRouteActions(item) {
+  if (!validCoordinates(item)) return "";
+  return `<div class="detail-route-actions"><div><strong>规划前往 ${esc(item.name)}</strong><span>直接带入路线，不用重新搜索地点。</span></div><button class="route-to-button" data-plan-route-to-candidate="${esc(item.id)}">↗ 到这里</button><button class="route-from-button" data-plan-route-from-candidate="${esc(item.id)}">↘ 从这里出发</button></div>`;
+}
 function renderCandidateDetail(item) {
   const area = areaForCandidate(item.id); const position = item.temporal?.trip_window_position || {};
   const altNames = [item.names?.ja, item.names?.en].filter(known).map(esc).join(" · ");
@@ -1049,7 +1072,7 @@ function renderCandidateDetail(item) {
   const tripExperience = dl([["9 月旅行体验",item.experience?.sep_2026_experience],["时间窗口",friendlyTiming(item.experience?.trip_window_fit)],["建议行程阶段",friendlyTiming(position.preferred_trip_segment)]]);
   const practical = dl([["建议停留时间",item.experience?.realistic_duration],["天气影响",item.experience?.weather_dependency],["体力要求",item.experience?.physical_load],["所在市町",item.municipality]]);
   const disappointment = known(item.experience?.common_disappointments) ? `<p>${esc(shown(item.experience.common_disappointments))}</p>` : "";
-  $("detailContent").innerHTML = `<header class="detail-hero"><span class="detail-category" style="--category-color:${COLORS[item.category]}">${esc(labelCategory(item.category))}</span><h2>${esc(item.name)}</h2>${altNames ? `<p class="alt-names">${altNames}</p>` : ""}</header>${renderDetailAreaAction(item)}<div class="detail-body"><div class="detail-tags">${area ? `<span class="detail-tag">已加入 ${esc(area.name)}</span>` : `<span class="detail-tag neutral">尚未加入地区</span>`}${item.municipality ? `<span class="detail-tag neutral">${esc(item.municipality)}</span>` : ""}</div>${renderGooglePlaceDetails(item)}${infoSection("30 秒了解", preview)}${infoSection("实际会做什么", displayList(item.experience?.what_you_actually_do))}${infoSection("9 月 5–18 日体验", tripExperience)}${infoSection("实用信息", practical)}${infoSection("可能失望之处", disappointment)}${infoSection("视觉资料",renderVisualEvidence(item))}</div>`;
+  $("detailContent").innerHTML = `<header class="detail-hero"><span class="detail-category" style="--category-color:${COLORS[item.category]}">${esc(labelCategory(item.category))}</span><h2>${esc(item.name)}</h2>${altNames ? `<p class="alt-names">${altNames}</p>` : ""}</header>${renderDetailRouteActions(item)}${renderDetailAreaAction(item)}<div class="detail-body"><div class="detail-tags">${area ? `<span class="detail-tag">已加入 ${esc(area.name)}</span>` : `<span class="detail-tag neutral">尚未加入地区</span>`}${item.municipality ? `<span class="detail-tag neutral">${esc(item.municipality)}</span>` : ""}</div>${renderGooglePlaceDetails(item)}${infoSection("30 秒了解", preview)}${infoSection("实际会做什么", displayList(item.experience?.what_you_actually_do))}${infoSection("9 月 5–18 日体验", tripExperience)}${infoSection("实用信息", practical)}${infoSection("可能失望之处", disappointment)}${infoSection("视觉资料",renderVisualEvidence(item))}</div>`;
 }
 function openCandidate(id) {
   const item = candidateById(id); if (!item) return;
@@ -1119,9 +1142,18 @@ function setupInteractions() {
     const catalogButton = event.target.closest("[data-preview-place]");
     if (catalogButton) previewPlace(catalogButton.dataset.previewPlace);
   });
-  $("placePreview").addEventListener("click", event => { if (event.target.closest("[data-add-preview-place]")) addPreviewPlace(); if (event.target.closest("[data-dismiss-preview]")) dismissPreview(); });
+  $("placePreview").addEventListener("click", event => {
+    if (event.target.closest("[data-plan-route-to-preview]") && state.searchPreview) return launchRoutePlanner(endpointFromSearchPlace(state.searchPreview), "destination");
+    if (event.target.closest("[data-plan-route-from-preview]") && state.searchPreview) return launchRoutePlanner(endpointFromSearchPlace(state.searchPreview), "origin");
+    if (event.target.closest("[data-add-preview-place]")) addPreviewPlace();
+    if (event.target.closest("[data-dismiss-preview]")) dismissPreview();
+  });
   $("mapFocusCard").addEventListener("click", event => {
     if (event.target.closest("[data-clear-area-focus]")) return clearAreaFocus();
+    const toCandidate = event.target.closest("[data-plan-route-to-candidate]"); if (toCandidate) return launchRoutePlanner(endpointFromCandidate(candidateById(toCandidate.dataset.planRouteToCandidate)), "destination");
+    const fromCandidate = event.target.closest("[data-plan-route-from-candidate]"); if (fromCandidate) return launchRoutePlanner(endpointFromCandidate(candidateById(fromCandidate.dataset.planRouteFromCandidate)), "origin");
+    const toArea = event.target.closest("[data-plan-route-to-area]"); if (toArea) return launchRoutePlanner(endpointFromArea(areaById(toArea.dataset.planRouteToArea)), "destination");
+    const fromArea = event.target.closest("[data-plan-route-from-area]"); if (fromArea) return launchRoutePlanner(endpointFromArea(areaById(fromArea.dataset.planRouteFromArea)), "origin");
     const reopen = event.target.closest("[data-reopen-candidate]"); if (reopen) return openCandidate(reopen.dataset.reopenCandidate);
     const nearby = event.target.closest("[data-explore-nearby]"); if (nearby) return openNearby(nearby.dataset.exploreNearby);
     const refresh = event.target.closest("[data-refresh-area]"); if (refresh) return void refreshAreaDetails(refresh.dataset.refreshArea);
@@ -1150,7 +1182,7 @@ function setupInteractions() {
   $("closeNearby").addEventListener("click", closeNearby);
   $("nearbyTypeChips").addEventListener("click", event => { const chip = event.target.closest("[data-nearby-type]"); if (!chip) return; state.nearbyType = chip.dataset.nearbyType; void searchNearby(); });
   $("nearbyResults").addEventListener("click", event => { const result = event.target.closest("[data-focus-nearby]"); if (result) return focusNearbyPlace(result.dataset.focusNearby); if (event.target.closest("[data-retry-nearby]")) void searchNearby(); });
-  $("candidateList").addEventListener("click", event => { const detail = event.target.closest("[data-open-candidate-detail]"); if (detail) return focusCandidate(detail.dataset.openCandidateDetail, { showDetails: true }); const add = event.target.closest("[data-quick-add-candidate]"); if (add) return focusCandidate(add.dataset.quickAddCandidate, { showDetails: true }); const focus = event.target.closest("[data-focus-candidate]"); if (focus) return focusCandidate(focus.dataset.focusCandidate, { showDetails: false }); });
+  $("candidateList").addEventListener("click", event => { const route = event.target.closest("[data-plan-route-to-candidate]"); if (route) return launchRoutePlanner(endpointFromCandidate(candidateById(route.dataset.planRouteToCandidate)), "destination"); const detail = event.target.closest("[data-open-candidate-detail]"); if (detail) return focusCandidate(detail.dataset.openCandidateDetail, { showDetails: true }); const add = event.target.closest("[data-quick-add-candidate]"); if (add) return focusCandidate(add.dataset.quickAddCandidate, { showDetails: true }); const focus = event.target.closest("[data-focus-candidate]"); if (focus) return focusCandidate(focus.dataset.focusCandidate, { showDetails: false }); });
   $("candidateCategoryChips").addEventListener("click", event => { const chip = event.target.closest("[data-category-chip]"); if (!chip) return; state.candidateCategory = chip.dataset.categoryChip; renderCandidates(); renderCounts(); if (state.view === "candidates") renderMap({fit:true}); });
   $("candidateSearch").addEventListener("input", event => { state.candidateQuery = event.target.value; renderCandidates(); renderCounts(); if (state.view === "candidates") renderMap({fit:true}); });
   $("candidateUnassignedOnly").addEventListener("change", event => { state.candidateUnassignedOnly = event.target.checked; renderCandidates(); renderCounts(); if (state.view === "candidates") renderMap({fit:true}); });
@@ -1161,6 +1193,8 @@ function setupInteractions() {
   $("savePicker").addEventListener("click", savePicker);
   $("closeDetail").addEventListener("click", () => $("detailDialog").close());
   $("detailContent").addEventListener("click", event => {
+    const toCandidate = event.target.closest("[data-plan-route-to-candidate]"); if (toCandidate) return launchRoutePlanner(endpointFromCandidate(candidateById(toCandidate.dataset.planRouteToCandidate)), "destination");
+    const fromCandidate = event.target.closest("[data-plan-route-from-candidate]"); if (fromCandidate) return launchRoutePlanner(endpointFromCandidate(candidateById(fromCandidate.dataset.planRouteFromCandidate)), "origin");
     const assign = event.target.closest("[data-assign-candidate]");
     if (assign) return assignCandidateToArea(assign.dataset.assignCandidate, $("detailAreaSelect")?.value);
     if (event.target.closest("[data-refresh-google-detail]")) { const item = candidateById(state.selectedCandidateId); if (item) void loadCandidateGoogleDetails(item, { force: true }); return; }

@@ -125,6 +125,7 @@ def main() -> int:
         failures.append("exact-ID validation did not reject a missing/unexpected candidate")
 
     app_text = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
+    styles_text = (ROOT / "web" / "styles.css").read_text(encoding="utf-8")
     adapter_text = (ROOT / "web" / "data-adapter.js").read_text(encoding="utf-8")
     index_text = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
     loader_text = (ROOT / "web" / "google-maps-loader.js").read_text(encoding="utf-8")
@@ -193,6 +194,9 @@ def main() -> int:
     route_ui = ("tripRouteSummary", "routesView", "routeOriginSearch", "routeDestinationSearch", "routeModeTabs", "routeResults", "savedRoutesList", "customRoutePanel")
     if any(element not in index_text for element in route_ui) or "nearbySheet" not in index_text:
         failures.append("route planner, saved route, custom route, or nearby exploration UI is missing")
+    direct_route_requirements = ("launchRoutePlanner", "data-plan-route-to-candidate", "data-plan-route-from-candidate", "data-plan-route-to-area", "data-plan-route-from-area", "data-plan-route-to-preview", "data-plan-route-from-preview", "route-quick-actions")
+    if any(requirement not in app_text + index_text + styles_text for requirement in direct_route_requirements):
+        failures.append("selected places cannot directly open route planning as origin or destination")
     if 'mapProvider = "google"' not in app_text or 'importLibrary("maps")' not in app_text:
         failures.append("Google Places results are not paired with a Google map")
     if "initLeafletMap" not in app_text or "无法正确加载 Google 地图" not in app_text:
