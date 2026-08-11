@@ -45,6 +45,12 @@
     return new Date(stamp).toISOString().slice(0, 16);
   }
 
+  function connectionCustomTimes(date, fromTime = "09:00", toTime = "") {
+    const departure = `${date}T${fromTime || "09:00"}`;
+    const arrival = toTime && toTime > (fromTime || "09:00") ? `${date}T${toTime}` : addMinutesToLocalDateTime(departure, 180);
+    return { departure, arrival };
+  }
+
   function routeByIdSafe(id) {
     if (typeof routeById === "function") return routeById(id);
     return state?.savedRoutes?.find(route => route.id === id) || null;
@@ -73,12 +79,11 @@
     if (!from || !to) return;
     const fromTime = state.candidatePlans?.[fromId]?.time || "09:00";
     const toTime = state.candidatePlans?.[toId]?.time || "";
-    const departure = `${date}T${fromTime}`;
-    const arrival = toTime && toTime > fromTime ? `${date}T${toTime}` : addMinutesToLocalDateTime(departure, 180);
+    const defaults = connectionCustomTimes(date, fromTime, toTime);
     const departureInput = document.getElementById("customDepartureTime");
     const arrivalInput = document.getElementById("customArrivalTime");
-    if (departureInput) departureInput.value = departure;
-    if (arrivalInput) arrivalInput.value = arrival;
+    if (departureInput) departureInput.value = defaults.departure;
+    if (arrivalInput) arrivalInput.value = defaults.arrival;
   }
 
   function clearRouteViewState() {
@@ -116,6 +121,7 @@
       plannerDateFromValue,
       plannerTimeFromValue,
       addMinutesToLocalDateTime,
+      connectionCustomTimes,
     };
     if (document.readyState === "complete") init();
     else window.addEventListener("load", () => init(), { once: true });
