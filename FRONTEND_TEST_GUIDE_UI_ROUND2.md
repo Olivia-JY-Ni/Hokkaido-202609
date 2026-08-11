@@ -4,6 +4,17 @@ Target: PR #1 / `agent/trip-planner-ui-v1`
 
 This round adds only itinerary/map UI on top of the existing planner. Do not merge until the checks below pass in a real browser.
 
+## 0. Second browser-pass regressions — must retest
+
+These four issues were found against PR head `94cf92d` and must all pass before merge:
+
+1. **Saved custom-route Japan time:** create/save a custom route for `2026-09-10 09:30–10:10`. Return to `行程`. The connector must show `09:30 → 10:10`, never `00:30 → 01:10` or another UTC-shifted time.
+2. **Custom-route date inheritance:** click a `＋ 添加交通` connector on `2026-09-10` with the previous Candidate at `09:00`. Open `＋ 自定义路线`. Its departure must already be on `2026-09-10` (normally `09:00`), and arrival must also default to `2026-09-10` rather than the old `2026-09-05` HTML defaults. If the next Candidate has a later planned time, that time may be used as the arrival default; otherwise a same-connection-day fallback is acceptable.
+3. **Mobile sidebar controls:** first save the desktop sidebar as fully collapsed. Then open/reload at `390×844`. The planner panel must remain usable and **no** `‹ / › / ⇤` sidebar width controls may be visible on mobile.
+4. **Return-to-itinerary route state:** enter the route workspace from an itinerary connector, then click `← 返回行程`. Confirm `document.body` no longer has `route-view-active` or `route-details-visible`. At mobile width, the itinerary must immediately return to the normal itinerary panel height rather than retaining the route-page `58%` layout.
+
+Do not merge if any of these four regressions remains.
+
 ## A. Itinerary transport connectors
 
 1. Give one day at least 3 Candidates with different visit times.
