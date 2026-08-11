@@ -34,7 +34,10 @@ jobs:
           node --check web/planner-custom-types.js
           node --check web/planner-runtime-fixes.js
           node --check web/planner-itinerary-ui.js
+          node --check web/planner-round2-regression-fixes.js
       - name: Test itinerary UI helpers
         run: node scripts/test_planner_itinerary_ui.mjs
+      - name: Test itinerary round 2 regressions
+        run: node scripts/test_planner_round2_regressions.mjs
       - name: Test NAVITIME route adapter
         run: node scripts/test_navitime_adapter.mjs
