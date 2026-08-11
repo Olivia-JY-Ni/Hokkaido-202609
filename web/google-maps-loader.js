@@ -30,10 +30,12 @@
 })();
 
 (() => {
-  const css = document.createElement("link");
-  css.rel = "stylesheet";
-  css.href = "planner-enhancements.css?v=20260811-4";
-  document.head.append(css);
+  ["planner-enhancements.css?v=20260811-5", "planner-itinerary-ui.css?v=20260811-1"].forEach(href => {
+    const css = document.createElement("link");
+    css.rel = "stylesheet";
+    css.href = href;
+    document.head.append(css);
+  });
 
   function appReady() {
     try {
@@ -58,9 +60,10 @@
       else console.warn("Planner enhancements skipped because the base app did not finish booting.");
       return;
     }
-    addScript("planner-enhancements.js?v=20260811-4", "planner-enhancements");
-    addScript("planner-custom-types.js?v=20260811-4", "planner-custom-types");
-    addScript("planner-runtime-fixes.js?v=20260811-4", "planner-runtime-fixes");
+    addScript("planner-enhancements.js?v=20260811-5", "planner-enhancements");
+    addScript("planner-custom-types.js?v=20260811-5", "planner-custom-types");
+    addScript("planner-runtime-fixes.js?v=20260811-5", "planner-runtime-fixes");
+    addScript("planner-itinerary-ui.js?v=20260811-1", "planner-itinerary-ui");
   }
 
   window.addEventListener("load", () => loadPlannerEnhancements(), { once: true });
