@@ -1,5 +1,6 @@
 const STORAGE_KEY = "hokkaido-trip-planner-v2";
 const NAVITIME_KEY_STORAGE = "hokkaido-navitime-rapidapi-key";
+const NAVITIME_QUOTA_STORAGE = "hokkaido-navitime-quota";
 const NAVITIME_HOST = "navitime-route-totalnavi.p.rapidapi.com";
 const state = {
   candidates: [], catalog: [], areas: [], view: "areas", selectedAreaId: null,
@@ -13,6 +14,7 @@ const state = {
   savedRoutes: [], activeSavedRouteId: null, routeOptions: [], selectedRouteOption: 0,
   routeStatus: "idle", routeRequestId: 0, routeSearchRequestId: 0, routeSearchTarget: null,
   routeSearchPredictions: [], routeSearchSessionToken: null, routeDetailsOpen: new Set(),
+  navitimeQuota: { limit: 500, remaining: null, resetSeconds: null, observedCalls: 0, authoritative: false, updatedAt: null },
   routeDraft: {
     origin: null, destination: null, travelMode: "TRANSIT", timeMode: "departure",
     dateTime: "2026-09-05T09:00", transitModes: [], transitPreference: "",
@@ -62,15 +64,70 @@ function known(value) { return !unknown(value); }
 function navitimeApiKey() { return sessionStorage.getItem(NAVITIME_KEY_STORAGE) || localStorage.getItem(NAVITIME_KEY_STORAGE) || ""; }
 function setNavitimeApiKey(value) {
   const key = String(value || "").trim();
+  const changed = key !== navitimeApiKey();
   if (key) localStorage.setItem(NAVITIME_KEY_STORAGE, key); else localStorage.removeItem(NAVITIME_KEY_STORAGE);
   sessionStorage.removeItem(NAVITIME_KEY_STORAGE);
+  if (changed) clearNavitimeQuota();
   renderNavitimeConnection();
+}
+function loadNavitimeQuota() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(NAVITIME_QUOTA_STORAGE) || "null");
+    if (saved && Number.isFinite(saved.limit) && saved.limit > 0) state.navitimeQuota = {
+      limit: saved.limit, remaining: Number.isFinite(saved.remaining) ? saved.remaining : null,
+      resetSeconds: Number.isFinite(saved.resetSeconds) ? saved.resetSeconds : null,
+      observedCalls: Number.isFinite(saved.observedCalls) ? saved.observedCalls : 0,
+      authoritative: Boolean(saved.authoritative), updatedAt: saved.updatedAt || null,
+    };
+  } catch (_) { /* use the safe default */ }
+}
+function saveNavitimeQuota() { localStorage.setItem(NAVITIME_QUOTA_STORAGE, JSON.stringify(state.navitimeQuota)); }
+function clearNavitimeQuota() {
+  state.navitimeQuota = { limit: 500, remaining: null, resetSeconds: null, observedCalls: 0, authoritative: false, updatedAt: null };
+  localStorage.removeItem(NAVITIME_QUOTA_STORAGE); renderNavitimeQuota();
+}
+function quotaHeaderNumber(headers,names) {
+  for (const name of names) {
+    const value = Number(headers?.get?.(name)); if (Number.isFinite(value) && value >= 0) return value;
+  }
+  return null;
+}
+function updateNavitimeQuota(response) {
+  const hardLimit = quotaHeaderNumber(response?.headers, ["x-rate-limit-rapid-free-plans-hard-limit-limit"]);
+  const hardRemaining = quotaHeaderNumber(response?.headers, ["x-rate-limit-rapid-free-plans-hard-limit-remaining"]);
+  const genericLimit = quotaHeaderNumber(response?.headers, ["x-ratelimit-requests-limit"]);
+  const genericRemaining = quotaHeaderNumber(response?.headers, ["x-ratelimit-requests-remaining"]);
+  const limit = hardLimit > 0 ? hardLimit : (genericLimit === 500 ? genericLimit : null);
+  const remaining = hardLimit > 0 ? hardRemaining : (genericLimit === 500 ? genericRemaining : null);
+  const resetSeconds = quotaHeaderNumber(response?.headers, hardLimit > 0 ? ["x-rate-limit-rapid-free-plans-hard-limit-reset"] : ["x-ratelimit-requests-reset"]);
+  if (Number.isFinite(limit) && Number.isFinite(remaining) && remaining >= 0) {
+    state.navitimeQuota = { limit, remaining: Math.min(limit,remaining), resetSeconds, observedCalls: Math.max(0,limit - remaining), authoritative: true, updatedAt: new Date().toISOString() };
+  } else if (response?.ok) {
+    state.navitimeQuota = { ...state.navitimeQuota, limit: state.navitimeQuota.limit || 500, remaining: null, resetSeconds: null, observedCalls: state.navitimeQuota.observedCalls + 1, authoritative: false, updatedAt: new Date().toISOString() };
+  }
+  saveNavitimeQuota(); renderNavitimeQuota();
+}
+function quotaResetLabel(seconds) {
+  if (!Number.isFinite(seconds)) return "";
+  const days = Math.ceil(seconds / 86400); if (days > 1) return ` · 约 ${days} 天后重置`;
+  const hours = Math.max(1,Math.ceil(seconds / 3600)); return ` · 约 ${hours} 小时后重置`;
+}
+function renderNavitimeQuota() {
+  const usage = $("navitimeQuotaUsage"); if (!usage) return;
+  const quota = state.navitimeQuota; const knownRemaining = Number.isFinite(quota.remaining);
+  const used = knownRemaining ? Math.max(0,quota.limit - quota.remaining) : quota.observedCalls;
+  usage.textContent = `${quota.authoritative ? "已使用" : "本浏览器已查询"} ${used} / ${quota.limit}`;
+  $("navitimeQuotaRemaining").textContent = knownRemaining ? `剩余 ${quota.remaining} 次${quotaResetLabel(quota.resetSeconds)}` : "查询后读取账户剩余额度";
+  const ratio = quota.limit ? Math.min(1,used / quota.limit) : 0; $("navitimeQuotaBar").style.width = `${ratio * 100}%`;
+  const box = $("navitimeQuota"); box.classList.toggle("warning", knownRemaining && quota.remaining / quota.limit <= .15); box.classList.toggle("depleted", knownRemaining && quota.remaining === 0);
 }
 function renderNavitimeConnection() {
   const connected = Boolean(navitimeApiKey()); const box = $("navitimeConnection"); if (!box) return;
   box.classList.toggle("connected", connected);
-  $("navitimeConnectionStatus").textContent = connected ? "已连接 · 每月最多 500 次" : "尚未连接 · 每月 500 次";
+  const remaining = state.navitimeQuota.remaining;
+  $("navitimeConnectionStatus").textContent = connected ? (Number.isFinite(remaining) ? `已连接 · 剩余 ${remaining} 次` : "已连接 · 免费额度 500 次") : "尚未连接 · 免费额度 500 次";
   $("toggleNavitimeSettings").textContent = connected ? "设置" : "连接";
+  renderNavitimeQuota();
 }
 function openNavitimeSettings() {
   $("navitimeSettings").hidden = false; $("navitimeApiKey").value = ""; $("navitimeApiKey").focus();
@@ -675,13 +732,14 @@ async function computeNavitimeTransitRoutes(origin,destination) {
   const params = new URLSearchParams({
     start: `${origin.lat},${origin.lon}`, goal: `${destination.lat},${destination.lon}`,
     [state.routeDraft.timeMode === "arrival" ? "goal_time" : "start_time"]: `${state.routeDraft.dateTime}:00`,
-    datum: "wgs84", coord_unit: "degree", shape: "true", options: "railway_calling_at",
+    datum: "wgs84", coord_unit: "degree", term: "1440", limit: "5", shape: "true", options: "railway_calling_at",
     order: state.routeDraft.transitPreference === "FEWER_TRANSFERS" ? "transit" : (state.routeDraft.transitPreference === "LESS_WALKING" ? "walk_distance" : "time_optimized"),
   });
   const selectedMode = state.routeDraft.transitModes[0];
   if (selectedMode === "RAIL") params.set("unuse", "domestic_flight.shuttle_bus");
   if (selectedMode === "BUS") params.set("unuse", "domestic_flight.superexpress_train.sleeper_ultraexpress.ultraexpress_train.express_train.rapid_train.semiexpress_train.local_train");
   const response = await fetch(`https://${NAVITIME_HOST}/route_transit?${params}`, { headers: { "X-RapidAPI-Key": apiKey, "X-RapidAPI-Host": NAVITIME_HOST, Accept: "application/json" } });
+  updateNavitimeQuota(response);
   let payload = {}; try { payload = await response.json(); } catch (_) { /* handled by status below */ }
   if (!response.ok) {
     if ([401,403].includes(response.status)) throw new Error("NAVITIME_KEY_INVALID");
@@ -879,7 +937,7 @@ function renderRoutePlanner(message = "") {
   document.body.classList.toggle("route-details-visible", state.view === "routes" && state.routeDetailsOpen.size > 0);
   renderNavitimeConnection();
   const isTransitMode = state.routeDraft.travelMode === "TRANSIT";
-  $("navitimeConnection").hidden = !isTransitMode; if (!isTransitMode) $("navitimeSettings").hidden = true;
+  $("navitimeConnection").hidden = !isTransitMode; $("navitimeQuota").hidden = !isTransitMode; if (!isTransitMode) $("navitimeSettings").hidden = true;
   document.querySelectorAll("[data-route-mode]").forEach(button => button.classList.toggle("active", button.dataset.routeMode === state.routeDraft.travelMode));
   document.querySelectorAll("[data-transit-mode]").forEach(button => button.classList.toggle("active", button.dataset.transitMode === (state.routeDraft.transitModes[0] || "")));
   $("transitFilters").hidden = !isTransitMode;
@@ -1350,7 +1408,7 @@ async function boot() {
     const responses = await Promise.all(paths.map(path => fetch(path))); if (responses.some(response => !response.ok)) throw new Error("数据文件无法读取");
     const [master,locations,batches,catalog] = await Promise.all(responses.map(response => response.json()));
     state.candidates = window.ResearchDataAdapter.buildCandidateViewModels(master,locations,batches); state.catalog = catalog.places || [];
-    loadUserState(); fillCategorySelect($("pickerCategory")); await initMap(); setupInteractions(); syncRouteForm(); renderAll({ fitMap: true });
+    loadUserState(); loadNavitimeQuota(); fillCategorySelect($("pickerCategory")); await initMap(); setupInteractions(); syncRouteForm(); renderAll({ fitMap: true });
   } catch (error) {
     $("areaList").innerHTML = `<div class="empty-state"><h3>无法载入地图数据</h3><p>${esc(error.message)}</p></div>`;
   }

@@ -7,7 +7,7 @@
   <meta name="description" content="Hokkaido 2026 September Trip 地区与候选地点旅行规划地图">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=20260811-12">
+  <link rel="stylesheet" href="styles.css?v=20260811-13">
 </head>
 <body>
   <header class="app-header">
@@ -78,6 +78,7 @@
           <div id="navitimeConnection" class="navitime-connection">
             <span class="navitime-source-mark">N</span><span><strong>NAVITIME 免费版</strong><small id="navitimeConnectionStatus">尚未连接 · 每月 500 次</small></span><button id="toggleNavitimeSettings" type="button">连接</button>
           </div>
+          <div id="navitimeQuota" class="navitime-quota"><div><strong id="navitimeQuotaUsage">本浏览器已查询 0 / 500</strong><small id="navitimeQuotaRemaining">连接后查询一次更新</small></div><span class="navitime-quota-track"><i id="navitimeQuotaBar"></i></span></div>
           <section id="navitimeSettings" class="navitime-settings" hidden>
             <div class="navitime-settings-heading"><strong>连接 NAVITIME 免费额度</strong><button id="closeNavitimeSettings" type="button" aria-label="关闭 NAVITIME 设置">×</button></div>
             <p>在 RapidAPI 启用 NAVITIME Route(totalnavi) Basic 后，把个人 API Key 粘贴到这里。密钥只保存在当前浏览器，不会写入公开代码。</p>
@@ -200,6 +201,6 @@
   <script src="google-maps-config.js"></script>
   <script src="google-maps-loader.js?v=20260811-2"></script>
   <script src="data-adapter.js"></script>
-  <script src="app.js?v=20260811-8"></script>
+  <script src="app.js?v=20260811-10"></script>
 </body>
 </html>

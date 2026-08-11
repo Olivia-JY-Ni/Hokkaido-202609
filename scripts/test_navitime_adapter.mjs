@@ -22,12 +22,13 @@ const context = {
   window: { ResearchDataAdapter: { unknown: value => value == null } },
   document: { getElementById: () => null, querySelectorAll: () => [] },
   localStorage: storage, sessionStorage: { ...storage, getItem: () => null },
-  console, Intl, Date, URLSearchParams, structuredClone, setTimeout, clearTimeout,
-  fetch: async (url, options) => { request = { url: String(url), options }; return { ok: true, status: 200, json: async () => responsePayload }; },
+  console, Intl, Date, URLSearchParams, Headers, structuredClone, setTimeout, clearTimeout,
+  fetch: async (url, options) => { request = { url: String(url), options }; return { ok: true, status: 200, headers: new Headers({ "x-rate-limit-rapid-free-plans-hard-limit-limit": "500", "x-rate-limit-rapid-free-plans-hard-limit-remaining": "487", "x-rate-limit-rapid-free-plans-hard-limit-reset": "100000" }), json: async () => responsePayload }; },
 };
 vm.createContext(context);
 vm.runInContext(`${source}\nstate.routeDraft.dateTime = "2026-09-05T09:00"; state.routeDraft.timeMode = "departure"; state.routeDraft.transitModes = ["RAIL"]; state.routeDraft.transitPreference = "FEWER_TRANSFERS"; this.resultPromise = computeNavitimeTransitRoutes({lat:43,lon:141},{lat:43.3,lon:141.4});`, context);
 const routes = await context.resultPromise;
+vm.runInContext("this.quotaSnapshot = structuredClone(state.navitimeQuota);", context);
 
 assert.equal(routes.length, 1);
 assert.equal(routes[0].provider, "navitime");
@@ -42,11 +43,23 @@ assert.match(routes[0].fare, /1,230/);
 assert.deepEqual(JSON.parse(JSON.stringify(routes[0].path)), [{lat:43,lng:141},{lat:43.15,lng:141.2},{lat:43.3,lng:141.4}]);
 assert.match(request.url, /\/route_transit\?/);
 assert.match(request.url, /shape=true/);
+assert.match(request.url, /term=1440/);
+assert.match(request.url, /limit=5/);
 assert.match(request.url, /options=railway_calling_at/);
 assert.match(request.url, /order=transit/);
 assert.match(request.url, /unuse=/);
 assert.equal(request.options.headers["X-RapidAPI-Key"], "synthetic-test-key");
 assert.equal(request.options.headers["X-RapidAPI-Host"], "navitime-route-totalnavi.p.rapidapi.com");
 assert.ok(!request.url.includes("synthetic-test-key"));
+assert.deepEqual(JSON.parse(JSON.stringify(context.quotaSnapshot)), { limit: 500, remaining: 487, resetSeconds: 100000, observedCalls: 13, authoritative: true, updatedAt: context.quotaSnapshot.updatedAt });
+assert.match(context.quotaSnapshot.updatedAt, /^\d{4}-\d{2}-\d{2}T/);
 
-console.log("NAVITIME adapter test passed: request mapping, fare, stops, timing, and route geometry.");
+vm.runInContext(`state.navitimeQuota = { limit: 500, remaining: null, resetSeconds: null, observedCalls: 0, authoritative: false, updatedAt: null };
+updateNavitimeQuota({ ok: true, headers: new Headers({ "x-ratelimit-requests-limit": "0", "x-ratelimit-requests-remaining": "0", "x-ratelimit-requests-reset": "3600" }) });
+this.genericZeroQuotaSnapshot = structuredClone(state.navitimeQuota);`, context);
+assert.equal(context.genericZeroQuotaSnapshot.authoritative, false);
+assert.equal(context.genericZeroQuotaSnapshot.observedCalls, 1);
+assert.equal(context.genericZeroQuotaSnapshot.limit, 500);
+assert.equal(context.genericZeroQuotaSnapshot.remaining, null);
+
+console.log("NAVITIME adapter test passed: request mapping, quota headers/fallback, fare, stops, timing, and route geometry.");

@@ -189,7 +189,9 @@ def main() -> int:
     navitime_requirements = (
         "NAVITIME_HOST", "computeNavitimeTransitRoutes", "serializeNavitimeRouteOption", "navitime-route-totalnavi.p.rapidapi.com",
         "/route_transit", "X-RapidAPI-Key", "reference_fare", "railway_calling_at", "navitimeConnection",
-        "navitimeSaveNotice", "recordNavitimeAsCustom", 'option.provider === "navitime"', "每月 500 次",
+        "navitimeSaveNotice", "recordNavitimeAsCustom", 'option.provider === "navitime"', "免费额度 500 次",
+        "navitimeQuotaUsage", "navitimeQuotaRemaining", "navitimeQuotaBar", "updateNavitimeQuota",
+        "x-rate-limit-rapid-free-plans-hard-limit-remaining", "x-ratelimit-requests-remaining",
     )
     if any(requirement not in app_text + index_text + styles_text for requirement in navitime_requirements):
         failures.append("NAVITIME Basic transit search, connection UI, attribution, or non-persistent result handling is incomplete")
