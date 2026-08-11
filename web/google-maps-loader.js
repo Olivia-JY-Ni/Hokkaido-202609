@@ -68,7 +68,7 @@
     addScript("planner-custom-types.js?v=20260811-6", "planner-custom-types");
     addScript("planner-runtime-fixes.js?v=20260811-6", "planner-runtime-fixes");
     addScript("planner-itinerary-ui.js?v=20260811-2", "planner-itinerary-ui");
-    addScript("planner-round2-regression-fixes.js?v=20260811-1", "planner-round2-regression-fixes");
+    addScript("planner-round2-regression-fixes.js?v=20260811-2", "planner-round2-regression-fixes");
   }
 
   window.addEventListener("load", () => loadPlannerEnhancements(), { once: true });
