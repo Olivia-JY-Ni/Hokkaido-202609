@@ -3,7 +3,7 @@ const NAVITIME_KEY_STORAGE = "hokkaido-navitime-rapidapi-key";
 const NAVITIME_QUOTA_STORAGE = "hokkaido-navitime-quota";
 const NAVITIME_HOST = "navitime-route-totalnavi.p.rapidapi.com";
 const state = {
-  candidates: [], catalog: [], areas: [], view: "areas", selectedAreaId: null,
+  candidates: [], customCandidates: [], candidatePlans: {}, catalog: [], areas: [], view: "areas", selectedAreaId: null,
   selectedCandidateId: null,
   expandedAreas: new Set(), showAreas: true, showCandidates: false,
   candidateQuery: "", candidateCategory: "", candidateUnassignedOnly: false,
@@ -15,6 +15,7 @@ const state = {
   routeStatus: "idle", routeRequestId: 0, routeSearchRequestId: 0, routeSearchTarget: null,
   routeSearchPredictions: [], routeSearchSessionToken: null, routeDetailsOpen: new Set(),
   navitimeQuota: { limit: 500, remaining: null, resetSeconds: null, observedCalls: 0, authoritative: false, updatedAt: null },
+  candidateEditorPlace: null, candidateEditorId: null,
   routeDraft: {
     origin: null, destination: null, travelMode: "TRANSIT", timeMode: "departure",
     dateTime: "2026-09-05T09:00", transitModes: [], transitPreference: "",
@@ -167,8 +168,26 @@ function areaForCandidate(id) { return state.areas.find(area => area.candidateId
 function candidatesForArea(id) { const area = areaById(id); return area ? area.candidateIds.map(candidateById).filter(Boolean) : []; }
 function routeById(id) { return state.savedRoutes.find(route => route.id === id) || null; }
 function searchCandidateText(item) {
-  return [item.id, item.name, item.names?.ja, item.names?.en, item.region, item.municipality, item.experience?.experience_summary]
+  return [item.id, item.name, item.names?.ja, item.names?.en, item.region, item.municipality, item.address, item.experience?.experience_summary, item.userNotes]
     .filter(Boolean).join(" ").toLowerCase();
+}
+function candidatePlan(id) {
+  return state.candidatePlans[id] || { date: "", time: "" };
+}
+function candidatePlanLabel(item) {
+  const plan = candidatePlan(item.id); if (!plan.date) return "";
+  const [,month,day] = plan.date.split("-");
+  const date = month && day ? `${Number(month)}月${Number(day)}日` : plan.date;
+  return `${date}${plan.time ? ` ${plan.time}` : ""}`;
+}
+function normalizeCustomCandidate(item) {
+  if (!item?.id || !item?.name || !Number.isFinite(item?.location?.lat) || !Number.isFinite(item?.location?.lon)) return null;
+  return {
+    ...item, userCreated: true, names: item.names || { ja: null, en: null, zh: item.name },
+    category: CATEGORY_LABELS[item.category] ? item.category : "architecture_museum_shop_workshop",
+    location: { ...item.location, verification_status: "verified", provider: "google_maps" },
+    experience: { ...(item.experience || {}), experience_summary: item.experience?.experience_summary || null, realistic_duration: item.experience?.realistic_duration || null },
+  };
 }
 function loadUserState() {
   try {
@@ -176,20 +195,26 @@ function loadUserState() {
     state.areas = Array.isArray(saved.areas) ? saved.areas.filter(area => area && area.id && Number.isFinite(area.lat) && Number.isFinite(area.lon)).map(area => ({
       id: area.id, placeId: area.placeId || area.id, name: area.name || "未命名地区", address: area.address || "",
       lat: area.lat, lon: area.lon, startDate: area.startDate || "", endDate: area.endDate || "",
-      nights: area.nights || "", note: area.note || "", candidateIds: Array.isArray(area.candidateIds) ? [...new Set(area.candidateIds)] : [],
+      note: area.note || "", candidateIds: Array.isArray(area.candidateIds) ? [...new Set(area.candidateIds)] : [],
       viewport: viewportJSON(area.viewport), primaryType: area.primaryType || "", types: Array.isArray(area.types) ? area.types : [],
       businessStatus: area.businessStatus || "", addressComponents: Array.isArray(area.addressComponents) ? area.addressComponents : [],
     })) : [];
+    state.customCandidates = Array.isArray(saved.customCandidates) ? saved.customCandidates.map(normalizeCustomCandidate).filter(Boolean) : [];
+    state.candidates.push(...state.customCandidates.filter(item => !state.candidates.some(existing => existing.id === item.id)));
+    state.candidatePlans = saved.candidatePlans && typeof saved.candidatePlans === "object" ? Object.fromEntries(Object.entries(saved.candidatePlans).map(([id,plan]) => [id, {
+      date: typeof plan?.date === "string" ? plan.date : "", time: typeof plan?.time === "string" ? plan.time : "",
+    }])) : {};
     state.selectedAreaId = state.areas.some(area => area.id === saved.selectedAreaId) ? saved.selectedAreaId : null;
     const googleRouteCutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
     state.savedRoutes = Array.isArray(saved.savedRoutes) ? saved.savedRoutes.filter(route => route?.id && route.origin && route.destination && route.selectedOption)
       .filter(route => route.selectedOption.custom || (route.updatedAt && new Date(route.updatedAt).getTime() >= googleRouteCutoff)) : [];
     state.activeSavedRouteId = state.savedRoutes.some(route => route.id === saved.activeSavedRouteId) ? saved.activeSavedRouteId : null;
-  } catch (_) { state.areas = []; state.selectedAreaId = null; }
+  } catch (_) { state.areas = []; state.customCandidates = []; state.candidatePlans = {}; state.selectedAreaId = null; }
 }
 function saveUserState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
     areas: state.areas, selectedAreaId: state.selectedAreaId,
+    customCandidates: state.customCandidates, candidatePlans: state.candidatePlans,
     savedRoutes: state.savedRoutes, activeSavedRouteId: state.activeSavedRouteId,
   }));
 }
@@ -430,7 +455,8 @@ function renderMapFocusCard() {
   const candidate = candidateById(state.selectedCandidateId);
   if (candidate) {
     const area = areaForCandidate(candidate.id);
-    $("mapFocusCard").innerHTML = `<div class="preview-top"><span class="focus-type-dot" style="background:${COLORS[candidate.category]}"></span><div class="preview-copy"><p class="preview-meta">当前候选地点</p><h3>${esc(candidate.name)}</h3><p>${esc(candidate.municipality || candidate.region || labelCategory(candidate.category))}</p></div></div>${validCoordinates(candidate) ? `<div class="route-quick-actions"><button class="route-to-button" data-plan-route-to-candidate="${esc(candidate.id)}"><span>↗</span>到这里</button><button class="route-from-button" data-plan-route-from-candidate="${esc(candidate.id)}"><span>↘</span>从这里出发</button></div>` : ""}<div class="focus-row"><span>${esc(labelCategory(candidate.category))}${area ? ` · ${esc(area.name)}` : ""}</span><button data-reopen-candidate="${esc(candidate.id)}">查看详情</button></div>`;
+    const planLabel = candidatePlanLabel(candidate);
+    $("mapFocusCard").innerHTML = `<div class="preview-top"><span class="focus-type-dot" style="background:${COLORS[candidate.category]}"></span><div class="preview-copy"><p class="preview-meta">当前候选地点</p><h3>${esc(candidate.name)}</h3><p>${esc(candidate.municipality || candidate.region || labelCategory(candidate.category))}</p>${planLabel ? `<span class="candidate-plan-date">${esc(planLabel)}</span>` : ""}</div></div>${validCoordinates(candidate) ? `<div class="route-quick-actions"><button class="route-to-button" data-plan-route-to-candidate="${esc(candidate.id)}"><span>↗</span>到这里</button><button class="route-from-button" data-plan-route-from-candidate="${esc(candidate.id)}"><span>↘</span>从这里出发</button></div>` : ""}<div class="focus-row"><span>${esc(labelCategory(candidate.category))}${area ? ` · ${esc(area.name)}` : ""}</span><button data-reopen-candidate="${esc(candidate.id)}">查看详情</button></div>`;
     $("mapFocusCard").hidden = false;
     return;
   }
@@ -445,25 +471,20 @@ function renderMapFocusCard() {
 function renderCounts() {
   const assigned = new Set(state.areas.flatMap(area => area.candidateIds));
   $("areaCount").textContent = state.areas.length; $("areaRailCount").textContent = state.areas.length;
-  $("assignedCount").textContent = assigned.size; $("candidateRailCount").textContent = filteredCandidates().length;
+  $("assignedCount").textContent = assigned.size; $("candidateLibraryCount").textContent = state.candidates.length; $("candidateRailCount").textContent = filteredCandidates().length;
 }
 function areaCandidateRows(area) {
   const items = candidatesForArea(area.id);
   if (!items.length) return '<div class="area-empty-candidates"><strong>还没有候选地点</strong><span>点击下方按钮，从资料库中选择。</span></div>';
-  return items.map(item => `<div class="area-candidate-row${item.id === state.selectedCandidateId ? " selected" : ""}"><span class="type-dot" style="background:${COLORS[item.category]}"></span><button data-focus-candidate="${esc(item.id)}"><strong>${esc(item.name)}</strong><span>${esc(labelCategory(item.category))}</span></button><button class="area-detail-button" data-open-candidate-detail="${esc(item.id)}">详情</button><button class="remove-mini" data-remove-candidate="${esc(item.id)}" data-area-id="${esc(area.id)}" aria-label="从地区移除 ${esc(item.name)}">×</button></div>`).join("");
-}
-function renderTripRouteSummary() {
-  const box = $("tripRouteSummary");
-  const count = state.savedRoutes.length;
-  box.innerHTML = `<span class="route-icon">⇄</span><span><strong>${count ? `已保存 ${count} 条交通路线` : "规划两地交通"}</strong><small>${count ? "查看班次、费用或更换方案" : "公共交通、步行、骑行与驾车方案"}</small></span><button data-open-route-planner aria-label="打开路线规划">›</button>`;
+  return items.map(item => { const planLabel = candidatePlanLabel(item); return `<div class="area-candidate-row${item.id === state.selectedCandidateId ? " selected" : ""}"><span class="type-dot" style="background:${COLORS[item.category]}"></span><button data-focus-candidate="${esc(item.id)}"><strong>${esc(item.name)}</strong><span>${esc(labelCategory(item.category))}</span>${planLabel ? `<em class="candidate-plan-date">${esc(planLabel)}</em>` : ""}</button><button class="area-detail-button" data-open-candidate-detail="${esc(item.id)}">详情</button><button class="remove-mini" data-remove-candidate="${esc(item.id)}" data-area-id="${esc(area.id)}" aria-label="从地区移除 ${esc(item.name)}">×</button></div>`; }).join("");
 }
 function renderAreaCard(area) {
   const selected = area.id === state.selectedAreaId; const expanded = state.expandedAreas.has(area.id);
   const dateLabel = area.startDate ? `${area.startDate}${area.endDate ? ` — ${area.endDate}` : ""}` : "日期未定";
   return `<article class="area-card${selected ? " selected" : ""}" data-area-card="${esc(area.id)}" draggable="true">
-    <div class="area-summary"><button class="drag-handle" aria-label="拖动调整顺序">⋮⋮</button><button class="area-main" data-select-area="${esc(area.id)}"><span class="area-title-row"><span class="area-pin">⭐</span><h3>${esc(area.name)}</h3></span><p>${esc(area.address)}</p><span class="area-inline-meta">${esc(dateLabel)}${area.nights ? ` · ${esc(area.nights)} 晚` : ""} · ${area.candidateIds.length} 个地点</span></button><button class="candidate-toggle" data-toggle-area-candidates="${esc(area.id)}" aria-expanded="${expanded}" aria-label="${expanded ? "收起" : "展开"} ${esc(area.name)} 的候选地点"><span class="chevron">⌄</span></button></div>
+    <div class="area-summary"><button class="drag-handle" aria-label="拖动调整顺序">⋮⋮</button><button class="area-main" data-select-area="${esc(area.id)}"><span class="area-title-row"><span class="area-pin">⭐</span><h3>${esc(area.name)}</h3></span><p>${esc(area.address)}</p><span class="area-inline-meta">${esc(dateLabel)} · ${area.candidateIds.length} 个地点</span></button><button class="candidate-toggle" data-toggle-area-candidates="${esc(area.id)}" aria-expanded="${expanded}" aria-label="${expanded ? "收起" : "展开"} ${esc(area.name)} 的候选地点"><span class="chevron">⌄</span></button></div>
     ${expanded ? `<div class="area-expanded"><div class="area-expanded-heading"><span>候选地点</span><button class="icon-menu-button" data-toggle-area-editor="${esc(area.id)}">编辑地区</button></div><div class="area-candidates">${areaCandidateRows(area)}</div><div class="area-primary-actions"><button class="add-candidates-button" data-open-picker="${esc(area.id)}">＋ 添加候选地点</button><button class="explore-nearby-button" data-explore-nearby="${esc(area.id)}">⌖ 探索周边</button></div></div>` : ""}
-    ${selected && area.editing ? `<div class="area-editor"><label>地区名称<input data-area-field="name" data-area-id="${esc(area.id)}" value="${esc(area.name)}"></label><label>停留晚数<input type="number" min="0" data-area-field="nights" data-area-id="${esc(area.id)}" value="${esc(area.nights)}"></label><label>开始日期<input type="date" data-area-field="startDate" data-area-id="${esc(area.id)}" value="${esc(area.startDate)}"></label><label>结束日期<input type="date" data-area-field="endDate" data-area-id="${esc(area.id)}" value="${esc(area.endDate)}"></label><label class="wide">备注<textarea data-area-field="note" data-area-id="${esc(area.id)}">${esc(area.note)}</textarea></label><button class="delete-area" data-delete-area="${esc(area.id)}">移除这个地区</button></div>` : ""}
+    ${selected && area.editing ? `<div class="area-editor"><label>地区名称<input data-area-field="name" data-area-id="${esc(area.id)}" value="${esc(area.name)}"></label><label>开始日期<input type="date" data-area-field="startDate" data-area-id="${esc(area.id)}" value="${esc(area.startDate)}"></label><label>结束日期<input type="date" data-area-field="endDate" data-area-id="${esc(area.id)}" value="${esc(area.endDate)}"></label><label class="wide">备注<textarea data-area-field="note" data-area-id="${esc(area.id)}">${esc(area.note)}</textarea></label><button class="delete-area" data-delete-area="${esc(area.id)}">移除这个地区</button></div>` : ""}
   </article>`;
 }
 function renderAreas() {
@@ -477,7 +498,8 @@ function candidateCard(item) {
   const area = areaForCandidate(item.id);
   const summary = shortSummary(item);
   const duration = known(item.experience?.realistic_duration) ? String(item.experience.realistic_duration) : "";
-  return `<article class="candidate-card${item.id === state.selectedCandidateId ? " selected" : ""}" data-candidate-card="${esc(item.id)}"><button class="candidate-card-main" data-focus-candidate="${esc(item.id)}"><span class="type-dot" style="background:${COLORS[item.category]}"></span><span class="candidate-card-copy"><span class="candidate-name-row"><strong>${esc(item.name)}</strong>${area ? `<span class="area-label">${esc(area.name)}</span>` : ""}</span><span class="candidate-meta">${esc(labelCategory(item.category))}${duration ? ` · ${esc(duration)}` : ""}${item.municipality ? ` · ${esc(item.municipality)}` : ""}</span>${summary ? `<span class="candidate-summary">${esc(summary)}</span>` : ""}</span></button><div class="candidate-card-actions">${validCoordinates(item) ? `<button data-plan-route-to-candidate="${esc(item.id)}">路线</button>` : ""}<button data-open-candidate-detail="${esc(item.id)}">详情</button><button class="candidate-quick-add" data-quick-add-candidate="${esc(item.id)}">${area ? "更改地区" : "＋ 加入地区"}</button></div></article>`;
+  const planLabel = candidatePlanLabel(item);
+  return `<article class="candidate-card${item.id === state.selectedCandidateId ? " selected" : ""}" data-candidate-card="${esc(item.id)}"><button class="candidate-card-main" data-focus-candidate="${esc(item.id)}"><span class="type-dot" style="background:${COLORS[item.category]}"></span><span class="candidate-card-copy"><span class="candidate-name-row"><strong>${esc(item.name)}</strong>${planLabel ? `<span class="candidate-plan-date">${esc(planLabel)}</span>` : ""}${area ? `<span class="area-label">${esc(area.name)}</span>` : ""}</span><span class="candidate-meta">${esc(labelCategory(item.category))}${duration ? ` · ${esc(duration)}` : ""}${item.municipality ? ` · ${esc(item.municipality)}` : ""}</span>${summary ? `<span class="candidate-summary">${esc(summary)}</span>` : ""}</span></button><div class="candidate-card-actions">${validCoordinates(item) ? `<button data-plan-route-to-candidate="${esc(item.id)}">路线</button>` : ""}<button data-open-candidate-detail="${esc(item.id)}">详情</button><button class="candidate-quick-add" data-quick-add-candidate="${esc(item.id)}">${area ? "更改地区" : "＋ 加入地区"}</button></div></article>`;
 }
 function renderCategoryChips() {
   const counts = new Map(); state.candidates.forEach(item => counts.set(item.category, (counts.get(item.category) || 0) + 1));
@@ -493,7 +515,7 @@ function renderCandidates() {
   $("candidateList").innerHTML = [...groups.entries()].map(([group,rows]) => `<section class="candidate-group"><div class="candidate-group-heading"><h3>${esc(group)}</h3><span>${rows.length}</span></div>${rows.map(candidateCard).join("")}</section>`).join("");
 }
 function renderAll({ fitMap = false } = {}) {
-  renderCounts(); renderTripRouteSummary(); renderAreas(); renderCandidates();
+  renderCounts(); renderAreas(); renderCandidates();
   if (state.view === "routes") renderRoutePlanner(); else renderSavedRoutes();
   renderMap({ fit: fitMap }); updateLayerButtons();
 }
@@ -1071,6 +1093,100 @@ function focusNearbyPlace(placeId) {
   state.selectedNearbyPlaceId = placeId; focusMapAt(place.location.lat(), place.location.lng(), 15); renderNearbySheet(); renderMap();
 }
 
+function addressComponentText(place, wantedTypes) {
+  const row = (place.address_components || []).find(component => (component.types || []).some(type => wantedTypes.includes(type)));
+  return row?.longText || row?.long_name || "";
+}
+function categoryFromGooglePlace(place) {
+  const types = [place.place_type, ...(place.types || [])].filter(Boolean).join(" ").toLowerCase();
+  if (/lodging|hotel|ryokan|spa|hot_spring/.test(types)) return "lodging_onsen";
+  if (/bakery|cafe|coffee|dessert|ice_cream/.test(types)) return "dessert_cafe_bakery";
+  if (/restaurant|food|meal|bar|market|store/.test(types)) return "food_market_drink";
+  if (/park|garden|mountain|natural|beach|ski|campground|hiking/.test(types)) return "natural_outdoor";
+  if (/zoo|aquarium|animal/.test(types)) return "animal_marine";
+  if (/transit|station|airport|ferry|bus_stop/.test(types)) return "special_transport";
+  if (/event|festival/.test(types)) return "event_festival";
+  return "architecture_museum_shop_workshop";
+}
+function existingCandidateForPlace(placeId) {
+  return state.candidates.find(item => item.location?.provider_place_id === placeId) || null;
+}
+function fillCandidateEditorAreas(selectedId = "") {
+  $("customCandidateArea").innerHTML = `<option value="">暂不加入地区</option>${state.areas.map(area => `<option value="${esc(area.id)}"${area.id === selectedId ? " selected" : ""}>${esc(area.name)}</option>`).join("")}`;
+}
+function openCandidateCreator(place) {
+  if (!place) return;
+  state.candidateEditorPlace = place; state.candidateEditorId = null;
+  $("customCandidateDialogTitle").textContent = "新增候选地点";
+  $("customCandidateDialogIntro").textContent = "Google Maps 已自动填写可读取的资料；空白内容可以直接补充或稍后编辑。";
+  $("customCandidateName").value = place.name_zh || "";
+  $("customCandidateCategory").value = categoryFromGooglePlace(place);
+  $("customCandidateAddress").value = place.formatted_address || "";
+  $("customCandidateMunicipality").value = addressComponentText(place, ["locality","administrative_area_level_2","sublocality_level_1"]);
+  $("customCandidateRegion").value = addressComponentText(place, ["administrative_area_level_1"]);
+  $("customCandidateWebsite").value = place.website_uri || "";
+  $("customCandidatePhone").value = place.phone || "";
+  $("customCandidateSummary").value = ""; $("customCandidateDuration").value = ""; $("customCandidateNotes").value = "";
+  $("customCandidateDate").value = ""; $("customCandidateTime").value = "";
+  $("customCandidateCoordinates").textContent = `${Number(place.lat).toFixed(6)}, ${Number(place.lon).toFixed(6)}`;
+  const facts = [Number.isFinite(place.rating) ? `评分 ${place.rating.toFixed(1)}（${place.user_rating_count || 0} 条）` : "", labelBusinessStatus(place.business_status), ...(place.regular_opening_hours || []).slice(0,2)].filter(Boolean);
+  $("customCandidateGoogleFacts").textContent = facts.length ? facts.join(" · ") : "Google Maps 未提供更多公开资料";
+  fillCandidateEditorAreas(""); $("deleteCustomCandidate").hidden = true;
+  if (!$("customCandidateDialog").open) $("customCandidateDialog").showModal();
+}
+function openCustomCandidateEditor(item) {
+  if (!item?.userCreated) return;
+  state.candidateEditorId = item.id; state.candidateEditorPlace = {
+    place_id: item.location?.provider_place_id, lat: item.location?.lat, lon: item.location?.lon,
+    business_status: item.google?.businessStatus || "", rating: item.google?.rating,
+    user_rating_count: item.google?.userRatingCount || 0, regular_opening_hours: item.google?.regularOpeningHours || [],
+  };
+  $("customCandidateDialogTitle").textContent = "编辑候选地点";
+  $("customCandidateDialogIntro").textContent = "Google Maps 资料和你补充的内容都可以在这里修改。";
+  $("customCandidateName").value = item.name || ""; $("customCandidateCategory").value = item.category || "architecture_museum_shop_workshop";
+  $("customCandidateAddress").value = item.address || ""; $("customCandidateMunicipality").value = item.municipality || ""; $("customCandidateRegion").value = item.region || "";
+  $("customCandidateWebsite").value = item.website || ""; $("customCandidatePhone").value = item.phone || "";
+  $("customCandidateSummary").value = item.experience?.experience_summary || ""; $("customCandidateDuration").value = item.experience?.realistic_duration || ""; $("customCandidateNotes").value = item.userNotes || "";
+  const plan = candidatePlan(item.id); $("customCandidateDate").value = plan.date; $("customCandidateTime").value = plan.time;
+  $("customCandidateCoordinates").textContent = `${Number(item.location.lat).toFixed(6)}, ${Number(item.location.lon).toFixed(6)}`;
+  const facts = [Number.isFinite(item.google?.rating) ? `评分 ${item.google.rating.toFixed(1)}（${item.google.userRatingCount || 0} 条）` : "", labelBusinessStatus(item.google?.businessStatus), ...(item.google?.regularOpeningHours || []).slice(0,2)].filter(Boolean);
+  $("customCandidateGoogleFacts").textContent = facts.length ? facts.join(" · ") : "Google Maps 未提供更多公开资料";
+  fillCandidateEditorAreas(areaForCandidate(item.id)?.id || ""); $("deleteCustomCandidate").hidden = false;
+  if (!$("customCandidateDialog").open) $("customCandidateDialog").showModal();
+}
+function saveCustomCandidate() {
+  const place = state.candidateEditorPlace; const current = candidateById(state.candidateEditorId);
+  const name = $("customCandidateName").value.trim(); if (!name) return showToast("请填写候选地点名称");
+  if (!place || !Number.isFinite(place.lat) || !Number.isFinite(place.lon)) return showToast("缺少 Google Maps 坐标");
+  const id = current?.id || `USR-GMAP-${place.place_id || `${place.lat}-${place.lon}`}`;
+  const item = current || normalizeCustomCandidate({
+    id, userCreated: true, name, names: { ja: null, en: null, zh: name }, country: "Japan",
+    category: $("customCandidateCategory").value, region: "", municipality: "", address: "",
+    location: { lat: place.lat, lon: place.lon, scope: "exact_entity", verification_status: "verified", provider: "google_maps", provider_place_id: place.place_id || "" },
+    experience: { experience_summary: null, realistic_duration: null, what_you_actually_do: [], why_people_love_it: null, common_disappointments: null },
+    temporal: {}, visual: { assets: [] }, sourcePacks: {},
+  });
+  if (!item) return showToast("无法建立候选地点");
+  item.name = name; item.names = { ...(item.names || {}), zh: name }; item.category = $("customCandidateCategory").value;
+  item.address = $("customCandidateAddress").value.trim(); item.municipality = $("customCandidateMunicipality").value.trim(); item.region = $("customCandidateRegion").value.trim();
+  item.website = $("customCandidateWebsite").value.trim(); item.phone = $("customCandidatePhone").value.trim(); item.userNotes = $("customCandidateNotes").value.trim();
+  item.experience = { ...(item.experience || {}), experience_summary: $("customCandidateSummary").value.trim() || null, realistic_duration: $("customCandidateDuration").value.trim() || null };
+  item.google = { ...(item.google || {}), businessStatus: place.business_status || item.google?.businessStatus || "", rating: place.rating ?? item.google?.rating ?? null,
+    userRatingCount: place.user_rating_count ?? item.google?.userRatingCount ?? 0, regularOpeningHours: place.regular_opening_hours || item.google?.regularOpeningHours || [] };
+  if (!current) { state.customCandidates.push(item); state.candidates.push(item); }
+  state.candidatePlans[id] = { date: $("customCandidateDate").value, time: $("customCandidateTime").value };
+  const areaId = $("customCandidateArea").value; state.areas.forEach(area => { area.candidateIds = area.candidateIds.filter(candidateId => candidateId !== id); });
+  if (areaId && areaById(areaId)) areaById(areaId).candidateIds.push(id);
+  state.selectedCandidateId = id; state.showCandidates = true; saveUserState(); $("customCandidateDialog").close(); dismissPreview(); renderAll({ fitMap: true }); focusMapAt(item.location.lat,item.location.lon,13); showToast(`已保存候选地点“${item.name}”`);
+}
+function deleteCustomCandidate() {
+  const item = candidateById(state.candidateEditorId); if (!item?.userCreated) return;
+  if (!window.confirm(`确认删除候选地点“${item.name}”吗？`)) return;
+  state.customCandidates = state.customCandidates.filter(candidate => candidate.id !== item.id); state.candidates = state.candidates.filter(candidate => candidate.id !== item.id);
+  state.areas.forEach(area => { area.candidateIds = area.candidateIds.filter(id => id !== item.id); }); delete state.candidatePlans[item.id];
+  state.selectedCandidateId = null; saveUserState(); $("customCandidateDialog").close(); if ($("detailDialog").open) $("detailDialog").close(); renderAll({ fitMap: true }); showToast("已删除自建候选地点");
+}
+
 function catalogMatches(query) {
   const value = query.trim().toLowerCase(); if (!value) return [];
   return state.catalog.filter(place => [place.name_zh, place.google_title, place.formatted_address, ...(place.search_terms || [])].join(" ").toLowerCase().includes(value)).slice(0, 8);
@@ -1131,7 +1247,7 @@ async function previewLivePlace(index) {
   $("areaSearchResults").innerHTML = '<div class="search-empty">正在确认地区…</div>';
   try {
     const place = prediction.toPlace();
-    await place.fetchFields({ fields: ["id","displayName","formattedAddress","location","viewport","primaryType","types","businessStatus","addressComponents"] });
+    await place.fetchFields({ fields: ["id","displayName","formattedAddress","location","viewport","primaryType","types","businessStatus","addressComponents","rating","userRatingCount","websiteURI","nationalPhoneNumber","regularOpeningHours"] });
     if (!place.location) throw new Error("missing location");
     state.searchSessionToken = null;
     showPlacePreview({
@@ -1142,6 +1258,8 @@ async function previewLivePlace(index) {
       lat: place.location.lat(), lon: place.location.lng(), place_type: place.primaryType || "city_or_area",
       viewport: viewportJSON(place.viewport), types: place.types || [], business_status: place.businessStatus || "",
       address_components: simplifyAddressComponents(place.addressComponents),
+      rating: place.rating, user_rating_count: place.userRatingCount || 0, website_uri: place.websiteURI || "", phone: place.nationalPhoneNumber || "",
+      regular_opening_hours: place.regularOpeningHours?.weekdayDescriptions || [],
     });
   } catch (_) {
     $("areaSearchResults").innerHTML = '<div class="search-empty">无法读取这个地区，请重新搜索</div>';
@@ -1151,8 +1269,9 @@ async function previewLivePlace(index) {
 function showPlacePreview(place) {
   state.searchPreview = place; $("areaSearchResults").hidden = true; $("mapFocusCard").hidden = true;
   const existing = state.areas.find(area => area.placeId === place.place_id);
+  const existingCandidate = existingCandidateForPlace(place.place_id);
   const status = labelBusinessStatus(place.business_status);
-  $("placePreview").innerHTML = `<div class="preview-top"><div class="preview-symbol">⌖</div><div class="preview-copy"><p class="preview-meta">Google Maps 地点 / 地区</p><h3>${esc(place.name_zh)}</h3><p>${esc(place.formatted_address)}</p><div class="place-preview-meta">${place.place_type ? `<span>${esc(place.place_type)}</span>` : ""}${status ? `<span>${esc(status)}</span>` : ""}</div></div></div><div class="route-quick-actions"><button class="route-to-button" data-plan-route-to-preview><span>↗</span>到这里</button><button class="route-from-button" data-plan-route-from-preview><span>↘</span>从这里出发</button></div><div class="preview-actions preview-secondary-actions"><button class="secondary-button" data-add-preview-place>${existing ? "查看已加入地点" : "加入行程 ⭐"}</button><button class="text-button" data-dismiss-preview>取消</button></div>`;
+  $("placePreview").innerHTML = `<div class="preview-top"><div class="preview-symbol">⌖</div><div class="preview-copy"><p class="preview-meta">Google Maps 地点 / 地区</p><h3>${esc(place.name_zh)}</h3><p>${esc(place.formatted_address)}</p><div class="place-preview-meta">${place.place_type ? `<span>${esc(place.place_type)}</span>` : ""}${status ? `<span>${esc(status)}</span>` : ""}</div></div></div><div class="route-quick-actions"><button class="route-to-button" data-plan-route-to-preview><span>↗</span>到这里</button><button class="route-from-button" data-plan-route-from-preview><span>↘</span>从这里出发</button></div><div class="preview-actions preview-secondary-actions"><button class="candidate-create-button" data-add-preview-candidate>${existingCandidate ? "查看候选地点" : "＋ 候选地点"}</button><button class="secondary-button" data-add-preview-place>${existing ? "查看已加入地点" : "加入行程 ⭐"}</button><button class="text-button" data-dismiss-preview>取消</button></div>`;
   $("placePreview").hidden = false; clearMapLayer(previewLayer);
   if (mapProvider === "google") {
     const marker = new google.maps.Marker({
@@ -1173,7 +1292,7 @@ function addPreviewPlace() {
   const id = `area-${place.place_id}`;
   state.areas.push({ id, placeId: place.place_id, name: place.name_zh, address: place.formatted_address, lat: place.lat, lon: place.lon,
     viewport: viewportJSON(place.viewport), primaryType: place.place_type || "", types: place.types || [], businessStatus: place.business_status || "",
-    addressComponents: place.address_components || [], startDate: "", endDate: "", nights: "", note: "", candidateIds: [] });
+    addressComponents: place.address_components || [], startDate: "", endDate: "", note: "", candidateIds: [] });
   state.expandedAreas.clear(); state.expandedAreas.add(id); state.selectedAreaId = id; state.showAreas = true; state.showCandidates = true;
   dismissPreview(); saveUserState(); renderAll({ fitMap: true });
 }
@@ -1253,6 +1372,13 @@ function renderDetailAreaAction(item) {
   const options = state.areas.map(area => `<option value="${esc(area.id)}"${current?.id === area.id ? " selected" : ""}>${esc(area.name)}</option>`).join("");
   return `<div class="detail-area-action"><label><strong>${current ? "更改所属地区" : "加入行程地区"}</strong><select id="detailAreaSelect"><option value="">请选择地区</option>${options}</select></label><button class="primary-button" data-assign-candidate="${esc(item.id)}">${current ? "更新地区" : "加入地区"}</button></div>`;
 }
+function renderCandidatePlanEditor(item) {
+  const plan = candidatePlan(item.id);
+  return `<section class="candidate-plan-editor"><div class="candidate-plan-heading"><div><strong>安排游玩日期和时间</strong><span>会显示在候选列表和所属地区中</span></div>${candidatePlanLabel(item) ? `<em>${esc(candidatePlanLabel(item))}</em>` : ""}</div><div class="candidate-plan-fields"><label>日期<input type="date" min="2026-09-05" max="2026-09-18" data-candidate-plan-field="date" data-candidate-id="${esc(item.id)}" value="${esc(plan.date)}"></label><label>时间<input type="time" data-candidate-plan-field="time" data-candidate-id="${esc(item.id)}" value="${esc(plan.time)}"></label></div></section>`;
+}
+function renderCustomCandidateAction(item) {
+  return item.userCreated ? `<div class="custom-candidate-action"><div><strong>自建候选地点</strong><span>修改 Google 自动资料或补充空白内容</span></div><button type="button" data-edit-custom-candidate="${esc(item.id)}">编辑资料</button></div>` : "";
+}
 function renderDetailRouteActions(item) {
   if (!validCoordinates(item)) return "";
   return `<div class="detail-route-actions"><div><strong>规划前往 ${esc(item.name)}</strong><span>直接带入路线，不用重新搜索地点。</span></div><button class="route-to-button" data-plan-route-to-candidate="${esc(item.id)}">↗ 到这里</button><button class="route-from-button" data-plan-route-from-candidate="${esc(item.id)}">↘ 从这里出发</button></div>`;
@@ -1262,9 +1388,9 @@ function renderCandidateDetail(item) {
   const altNames = [item.names?.ja, item.names?.en].filter(known).map(esc).join(" · ");
   const preview = dl([["体验概览",item.experience?.experience_summary],["值得去的原因",item.experience?.why_people_love_it]]);
   const tripExperience = dl([["9 月旅行体验",item.experience?.sep_2026_experience],["时间窗口",friendlyTiming(item.experience?.trip_window_fit)],["建议行程阶段",friendlyTiming(position.preferred_trip_segment)]]);
-  const practical = dl([["建议停留时间",item.experience?.realistic_duration],["天气影响",item.experience?.weather_dependency],["体力要求",item.experience?.physical_load],["所在市町",item.municipality]]);
+  const practical = dl([["建议停留时间",item.experience?.realistic_duration],["地址",item.address],["电话",item.phone],["网站",item.website],["天气影响",item.experience?.weather_dependency],["体力要求",item.experience?.physical_load],["所在市町",item.municipality],["个人备注",item.userNotes]]);
   const disappointment = known(item.experience?.common_disappointments) ? `<p>${esc(shown(item.experience.common_disappointments))}</p>` : "";
-  $("detailContent").innerHTML = `<header class="detail-hero"><span class="detail-category" style="--category-color:${COLORS[item.category]}">${esc(labelCategory(item.category))}</span><h2>${esc(item.name)}</h2>${altNames ? `<p class="alt-names">${altNames}</p>` : ""}</header>${renderDetailRouteActions(item)}${renderDetailAreaAction(item)}<div class="detail-body"><div class="detail-tags">${area ? `<span class="detail-tag">已加入 ${esc(area.name)}</span>` : `<span class="detail-tag neutral">尚未加入地区</span>`}${item.municipality ? `<span class="detail-tag neutral">${esc(item.municipality)}</span>` : ""}</div>${renderGooglePlaceDetails(item)}${infoSection("30 秒了解", preview)}${infoSection("实际会做什么", displayList(item.experience?.what_you_actually_do))}${infoSection("9 月 5–18 日体验", tripExperience)}${infoSection("实用信息", practical)}${infoSection("可能失望之处", disappointment)}${infoSection("视觉资料",renderVisualEvidence(item))}</div>`;
+  $("detailContent").innerHTML = `<header class="detail-hero"><span class="detail-category" style="--category-color:${COLORS[item.category]}">${esc(labelCategory(item.category))}</span><h2>${esc(item.name)}</h2>${altNames ? `<p class="alt-names">${altNames}</p>` : ""}</header>${renderCandidatePlanEditor(item)}${renderCustomCandidateAction(item)}${renderDetailRouteActions(item)}${renderDetailAreaAction(item)}<div class="detail-body"><div class="detail-tags">${area ? `<span class="detail-tag">已加入 ${esc(area.name)}</span>` : `<span class="detail-tag neutral">尚未加入地区</span>`}${item.municipality ? `<span class="detail-tag neutral">${esc(item.municipality)}</span>` : ""}</div>${renderGooglePlaceDetails(item)}${infoSection("30 秒了解", preview)}${infoSection("实际会做什么", displayList(item.experience?.what_you_actually_do))}${infoSection("9 月 5–18 日体验", tripExperience)}${infoSection("实用信息", practical)}${infoSection("可能失望之处", disappointment)}${infoSection("视觉资料",renderVisualEvidence(item))}</div>`;
 }
 function openCandidate(id) {
   const item = candidateById(id); if (!item) return;
@@ -1345,6 +1471,10 @@ function setupInteractions() {
   $("placePreview").addEventListener("click", event => {
     if (event.target.closest("[data-plan-route-to-preview]") && state.searchPreview) return launchRoutePlanner(endpointFromSearchPlace(state.searchPreview), "destination");
     if (event.target.closest("[data-plan-route-from-preview]") && state.searchPreview) return launchRoutePlanner(endpointFromSearchPlace(state.searchPreview), "origin");
+    if (event.target.closest("[data-add-preview-candidate]") && state.searchPreview) {
+      const existing = existingCandidateForPlace(state.searchPreview.place_id); if (existing) { dismissPreview(); return focusCandidate(existing.id, { showDetails: true }); }
+      return openCandidateCreator(state.searchPreview);
+    }
     if (event.target.closest("[data-add-preview-place]")) addPreviewPlace();
     if (event.target.closest("[data-dismiss-preview]")) dismissPreview();
   });
@@ -1378,7 +1508,6 @@ function setupInteractions() {
   $("areaList").addEventListener("dragend", event => { event.target.closest("[data-area-card]")?.classList.remove("dragging"); state.draggedAreaId = null; });
   $("areaList").addEventListener("dragover", event => event.preventDefault());
   $("areaList").addEventListener("drop", event => { event.preventDefault(); const target = event.target.closest("[data-area-card]")?.dataset.areaCard; if (!target || !state.draggedAreaId || target === state.draggedAreaId) return; const from = state.areas.findIndex(area => area.id === state.draggedAreaId); const to = state.areas.findIndex(area => area.id === target); const [moved] = state.areas.splice(from,1); state.areas.splice(to,0,moved); saveUserState(); renderAll({ fitMap: true }); });
-  $("tripRouteSummary").addEventListener("click", event => { if (event.target.closest("[data-open-route-planner]")) switchView("routes"); });
   $("closeNearby").addEventListener("click", closeNearby);
   $("nearbyTypeChips").addEventListener("click", event => { const chip = event.target.closest("[data-nearby-type]"); if (!chip) return; state.nearbyType = chip.dataset.nearbyType; void searchNearby(); });
   $("nearbyResults").addEventListener("click", event => { const result = event.target.closest("[data-focus-nearby]"); if (result) return focusNearbyPlace(result.dataset.focusNearby); if (event.target.closest("[data-retry-nearby]")) void searchNearby(); });
@@ -1386,19 +1515,30 @@ function setupInteractions() {
   $("candidateCategoryChips").addEventListener("click", event => { const chip = event.target.closest("[data-category-chip]"); if (!chip) return; state.candidateCategory = chip.dataset.categoryChip; renderCandidates(); renderCounts(); if (state.view === "candidates") renderMap({fit:true}); });
   $("candidateSearch").addEventListener("input", event => { state.candidateQuery = event.target.value; renderCandidates(); renderCounts(); if (state.view === "candidates") renderMap({fit:true}); });
   $("candidateUnassignedOnly").addEventListener("change", event => { state.candidateUnassignedOnly = event.target.checked; renderCandidates(); renderCounts(); if (state.view === "candidates") renderMap({fit:true}); });
+  $("addCandidateFromGoogle").addEventListener("click", () => { $("areaSearch").focus(); $("areaSearch").scrollIntoView({ behavior: "smooth", block: "center" }); showToast("搜索地点后，选择“＋ 候选地点”"); });
   $("closePicker").addEventListener("click", closePicker); $("drawerScrim").addEventListener("click", closePicker);
   ["pickerSearch","pickerCategory","pickerUnassignedOnly"].forEach(id => $(id).addEventListener(id === "pickerSearch" ? "input" : "change", renderPicker));
   $("pickerCandidateList").addEventListener("change", event => { if (event.target.matches('input[type="checkbox"]')) { event.target.checked ? state.pickerSelection.add(event.target.value) : state.pickerSelection.delete(event.target.value); $("pickerSelectionCount").textContent = `已选择 ${state.pickerSelection.size}`; } });
   $("selectAllPicker").addEventListener("click", () => { pickerCandidates().forEach(item => state.pickerSelection.add(item.id)); renderPicker(); });
   $("savePicker").addEventListener("click", savePicker);
   $("closeDetail").addEventListener("click", () => $("detailDialog").close());
+  $("closeCustomCandidate").addEventListener("click", () => $("customCandidateDialog").close());
+  $("cancelCustomCandidate").addEventListener("click", () => $("customCandidateDialog").close());
+  $("saveCustomCandidate").addEventListener("click", saveCustomCandidate);
+  $("deleteCustomCandidate").addEventListener("click", deleteCustomCandidate);
   $("detailContent").addEventListener("click", event => {
     const toCandidate = event.target.closest("[data-plan-route-to-candidate]"); if (toCandidate) return launchRoutePlanner(endpointFromCandidate(candidateById(toCandidate.dataset.planRouteToCandidate)), "destination");
     const fromCandidate = event.target.closest("[data-plan-route-from-candidate]"); if (fromCandidate) return launchRoutePlanner(endpointFromCandidate(candidateById(fromCandidate.dataset.planRouteFromCandidate)), "origin");
     const assign = event.target.closest("[data-assign-candidate]");
     if (assign) return assignCandidateToArea(assign.dataset.assignCandidate, $("detailAreaSelect")?.value);
+    const editCustom = event.target.closest("[data-edit-custom-candidate]");
+    if (editCustom) { const item = candidateById(editCustom.dataset.editCustomCandidate); $("detailDialog").close(); return openCustomCandidateEditor(item); }
     if (event.target.closest("[data-refresh-google-detail]")) { const item = candidateById(state.selectedCandidateId); if (item) void loadCandidateGoogleDetails(item, { force: true }); return; }
     if (event.target.closest("[data-go-to-areas]")) { $("detailDialog").close(); switchView("areas"); $("areaSearch").focus(); }
+  });
+  $("detailContent").addEventListener("change", event => {
+    const field = event.target.dataset.candidatePlanField; const id = event.target.dataset.candidateId; if (!field || !candidateById(id)) return;
+    state.candidatePlans[id] = { ...candidatePlan(id), [field]: event.target.value }; saveUserState(); renderAreas(); renderCandidates(); renderMapFocusCard(); renderCandidateDetail(candidateById(id)); showToast("已更新游玩时间");
   });
 }
 
@@ -1408,7 +1548,7 @@ async function boot() {
     const responses = await Promise.all(paths.map(path => fetch(path))); if (responses.some(response => !response.ok)) throw new Error("数据文件无法读取");
     const [master,locations,batches,catalog] = await Promise.all(responses.map(response => response.json()));
     state.candidates = window.ResearchDataAdapter.buildCandidateViewModels(master,locations,batches); state.catalog = catalog.places || [];
-    loadUserState(); loadNavitimeQuota(); fillCategorySelect($("pickerCategory")); await initMap(); setupInteractions(); syncRouteForm(); renderAll({ fitMap: true });
+    loadUserState(); loadNavitimeQuota(); fillCategorySelect($("pickerCategory")); fillCategorySelect($("customCandidateCategory")); await initMap(); setupInteractions(); syncRouteForm(); renderAll({ fitMap: true });
   } catch (error) {
     $("areaList").innerHTML = `<div class="empty-state"><h3>无法载入地图数据</h3><p>${esc(error.message)}</p></div>`;
   }

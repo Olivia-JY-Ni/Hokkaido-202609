@@ -172,8 +172,18 @@ def main() -> int:
     if "radius: 850000" in app_text:
         failures.append("Places autocomplete uses a circle radius beyond Google's 50 km limit")
     core_place_fields = ('"viewport"', '"types"', '"businessStatus"', '"addressComponents"')
-    if 'await place.fetchFields({ fields: ["id","displayName","formattedAddress","location","viewport","primaryType","types","businessStatus","addressComponents"] })' not in app_text or any(field not in app_text for field in core_place_fields):
+    if 'await place.fetchFields({ fields: ["id","displayName","formattedAddress","location","viewport","primaryType","types","businessStatus","addressComponents"' not in app_text or any(field not in app_text for field in core_place_fields):
         failures.append("selected live area does not fetch identity, coordinates, viewport, type, status, and address structure")
+    custom_candidate_requirements = (
+        "customCandidates", "candidatePlans", "openCandidateCreator", "saveCustomCandidate", "data-add-preview-candidate",
+        "customCandidateDialog", "customCandidateCategory", "customCandidateSummary", "categoryFromGooglePlace",
+        '"rating","userRatingCount","websiteURI","nationalPhoneNumber","regularOpeningHours"',
+        "data-candidate-plan-field", "candidatePlanLabel", "candidate-plan-date", "addCandidateFromGoogle",
+    )
+    if any(requirement not in app_text + index_text + styles_text for requirement in custom_candidate_requirements):
+        failures.append("browser-local Google Maps Candidate creation, editable autofill, or visit scheduling is incomplete")
+    if "nights" in app_text or "停留晚数" in app_text + index_text or "tripRouteSummary" in app_text + index_text:
+        failures.append("removed nights field or area-view route shortcut is still present")
     if "Place.searchNearby" not in app_text or "includedPrimaryTypes" not in app_text or "data-nearby-type" not in app_text:
         failures.append("on-demand Google Nearby Search exploration is missing")
     route_requirements = (
@@ -202,7 +212,7 @@ def main() -> int:
         failures.append("custom transport routes for unlisted buses, ferries, or shuttles are incomplete")
     if "loadCandidateGoogleDetails" not in app_text or "regularOpeningHours" not in app_text or "userRatingCount" not in app_text or "accessibilityOptions" not in app_text:
         failures.append("on-demand Google Candidate details are missing")
-    route_ui = ("tripRouteSummary", "routesView", "routeOriginSearch", "routeDestinationSearch", "routeModeTabs", "routeResults", "savedRoutesList", "customRoutePanel")
+    route_ui = ("routesView", "routeOriginSearch", "routeDestinationSearch", "routeModeTabs", "routeResults", "savedRoutesList", "customRoutePanel")
     if any(element not in index_text for element in route_ui) or "nearbySheet" not in index_text:
         failures.append("route planner, saved route, custom route, or nearby exploration UI is missing")
     direct_route_requirements = ("launchRoutePlanner", "data-plan-route-to-candidate", "data-plan-route-from-candidate", "data-plan-route-to-area", "data-plan-route-from-area", "data-plan-route-to-preview", "data-plan-route-from-preview", "route-quick-actions")

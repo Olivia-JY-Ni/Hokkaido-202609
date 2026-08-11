@@ -7,7 +7,7 @@
   <meta name="description" content="Hokkaido 2026 September Trip 地区与候选地点旅行规划地图">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=20260811-13">
+  <link rel="stylesheet" href="styles.css?v=20260811-14">
 </head>
 <body>
   <header class="app-header">
@@ -17,7 +17,7 @@
     </div>
     <div class="header-stats" aria-live="polite">
       <span><strong id="areaCount">0</strong> 个行程地区</span>
-      <span>已加入 <strong id="assignedCount">0</strong> · 候选库 77</span>
+      <span>已加入 <strong id="assignedCount">0</strong> · 候选库 <strong id="candidateLibraryCount">77</strong></span>
     </div>
   </header>
 
@@ -35,7 +35,6 @@
           <span id="areaRailCount" class="count-badge">0</span>
         </div>
         <p class="panel-intro">搜索市或地区并加入行程，再由你决定加入哪些候选地点。</p>
-        <div id="tripRouteSummary" class="trip-route-summary" aria-live="polite"></div>
         <div id="areaList" class="area-list"></div>
       </section>
 
@@ -129,6 +128,7 @@
           <span id="candidateRailCount" class="count-badge">77</span>
         </div>
         <div class="candidate-tools">
+          <button id="addCandidateFromGoogle" class="add-google-candidate-button" type="button"><span>⌖</span> 从 Google Maps 新增</button>
           <label class="compact-search"><span aria-hidden="true">⌕</span><input id="candidateSearch" type="search" placeholder="搜索名称、地区或体验"></label>
           <div id="candidateCategoryChips" class="category-chips" aria-label="按类型筛选"></div>
           <label class="inline-check"><input id="candidateUnassignedOnly" type="checkbox"> 只看未归属</label>
@@ -195,12 +195,33 @@
     <article id="detailContent"></article>
   </dialog>
 
+  <dialog id="customCandidateDialog" class="custom-candidate-dialog">
+    <div class="custom-candidate-dialog-heading"><div><p class="section-kicker">GOOGLE MAPS 候选地点</p><h2 id="customCandidateDialogTitle">新增候选地点</h2><p id="customCandidateDialogIntro"></p></div><button id="closeCustomCandidate" class="round-button" type="button" aria-label="关闭候选地点编辑">×</button></div>
+    <div class="custom-candidate-google-summary"><span>坐标 <strong id="customCandidateCoordinates"></strong></span><small id="customCandidateGoogleFacts"></small></div>
+    <div class="custom-candidate-form">
+      <label class="wide">地点名称<input id="customCandidateName" type="text" required></label>
+      <label>候选类型<select id="customCandidateCategory"></select></label>
+      <label>所属地区<select id="customCandidateArea"><option value="">暂不加入地区</option></select></label>
+      <label class="wide">地址<input id="customCandidateAddress" type="text"></label>
+      <label>市 / 町<input id="customCandidateMunicipality" type="text" placeholder="Google 未识别时可填写"></label>
+      <label>区域<input id="customCandidateRegion" type="text" placeholder="例如：札幌、道北"></label>
+      <label>游玩日期<input id="customCandidateDate" type="date" min="2026-09-05" max="2026-09-18"></label>
+      <label>游玩时间<input id="customCandidateTime" type="time"></label>
+      <label>电话<input id="customCandidatePhone" type="text"></label>
+      <label>建议停留时间<input id="customCandidateDuration" type="text" placeholder="例如：2 小时"></label>
+      <label class="wide">网站<input id="customCandidateWebsite" type="url"></label>
+      <label class="wide">体验简介<textarea id="customCandidateSummary" rows="2" placeholder="Google 无法自动填写，可自行补充"></textarea></label>
+      <label class="wide">个人备注<textarea id="customCandidateNotes" rows="2" placeholder="预约、门票、想做的事情等"></textarea></label>
+    </div>
+    <div class="custom-candidate-dialog-actions"><button id="deleteCustomCandidate" class="danger-text-button" type="button" hidden>删除候选地点</button><span></span><button id="cancelCustomCandidate" class="secondary-button" type="button">取消</button><button id="saveCustomCandidate" class="primary-button" type="button">保存候选地点</button></div>
+  </dialog>
+
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="google-maps-config.js"></script>
   <script src="google-maps-loader.js?v=20260811-2"></script>
   <script src="data-adapter.js"></script>
-  <script src="app.js?v=20260811-10"></script>
+  <script src="app.js?v=20260811-11"></script>
 </body>
 </html>
