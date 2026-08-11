@@ -28,3 +28,18 @@
     document.head.append(script);
   });
 })();
+
+(() => {
+  const css = document.createElement("link");
+  css.rel = "stylesheet";
+  css.href = "planner-enhancements.css?v=20260811-1";
+  document.head.append(css);
+
+  window.addEventListener("load", () => {
+    if (document.querySelector('script[data-planner-enhancements]')) return;
+    const script = document.createElement("script");
+    script.src = "planner-enhancements.js?v=20260811-1";
+    script.dataset.plannerEnhancements = "true";
+    document.body.append(script);
+  }, { once: true });
+})();
