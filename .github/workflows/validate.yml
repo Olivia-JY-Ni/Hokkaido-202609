@@ -33,5 +33,8 @@ jobs:
           node --check web/planner-enhancements.js
           node --check web/planner-custom-types.js
           node --check web/planner-runtime-fixes.js
+          node --check web/planner-itinerary-ui.js
+      - name: Test itinerary UI helpers
+        run: node scripts/test_planner_itinerary_ui.mjs
       - name: Test NAVITIME route adapter
         run: node scripts/test_navitime_adapter.mjs
