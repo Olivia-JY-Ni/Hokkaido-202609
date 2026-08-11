@@ -20,8 +20,17 @@ jobs:
       - name: Run dependency-free project tests
         run: python scripts/test_project.py
       - name: Parse JSON artifacts
-        run: python -m json.tool data/hokkaido_places_master.json > /dev/null && python -m json.tool data/candidate_locations.json > /dev/null && python -m json.tool data/research_batches_level1.json > /dev/null
+        run: |
+          python -m json.tool data/hokkaido_places_master.json > /dev/null
+          python -m json.tool data/candidate_locations.json > /dev/null
+          python -m json.tool data/research_batches_level1.json > /dev/null
+          python -m json.tool data/planner_overlay_20260811.json > /dev/null
       - name: Check JavaScript syntax
-        run: node --check web/data-adapter.js && node --check web/app.js
+        run: |
+          node --check web/data-adapter.js
+          node --check web/app.js
+          node --check web/google-maps-loader.js
+          node --check web/planner-enhancements.js
+          node --check web/planner-custom-types.js
       - name: Test NAVITIME route adapter
         run: node scripts/test_navitime_adapter.mjs
