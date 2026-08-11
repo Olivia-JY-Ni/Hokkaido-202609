@@ -4,6 +4,22 @@ Target: PR #1 / `agent/trip-planner-ui-v1`
 
 This round adds only itinerary/map UI on top of the existing planner. Do not merge until the checks below pass in a real browser.
 
+## P0. Saved-route freeze regression — must pass first
+
+This blocker was reproduced against PR head `a2f64de` and must pass before any other merge decision:
+
+1. Start with fresh browser storage.
+2. Create two Candidates on `2026-09-10`, open their `＋ 添加交通` connector, and save a custom route for `09:30–10:10`.
+3. Click `← 返回行程`.
+4. The itinerary must render immediately and remain responsive. Scrolling, changing tabs, opening Candidate detail, and opening the layer panel must all still work.
+5. Refresh the page while that saved route remains in browser storage. The app must finish loading and remain responsive.
+6. Repeat with a second clean browser profile / incognito storage.
+7. In DevTools, confirm there is no runaway MutationObserver / microtask loop and the connector still shows `09:30 → 10:10`.
+
+Implementation expectation: saved-route time refreshes are idempotent. The itinerary observer watches only root child replacement, not descendant text mutations, and identical connector labels must not be written to the DOM again.
+
+**Do not merge if any freeze, sustained CPU spike, or repeated DOM mutation loop remains.**
+
 ## 0. Second browser-pass regressions — must retest
 
 These four issues were found against PR head `94cf92d` and must all pass before merge:
