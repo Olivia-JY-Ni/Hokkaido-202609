@@ -32,21 +32,37 @@
 (() => {
   const css = document.createElement("link");
   css.rel = "stylesheet";
-  css.href = "planner-enhancements.css?v=20260811-2";
+  css.href = "planner-enhancements.css?v=20260811-3";
   document.head.append(css);
 
-  window.addEventListener("load", () => {
+  function appReady() {
+    try {
+      return typeof state !== "undefined" && Array.isArray(state.candidates) && state.candidates.length > 0 &&
+        Array.isArray(state.catalog) && state.catalog.length > 0 && typeof map !== "undefined" && Boolean(map) &&
+        typeof renderAll === "function" && typeof saveUserState === "function";
+    } catch (_) {
+      return false;
+    }
+  }
+  function loadPlannerEnhancements(attempt = 0) {
+    if (!appReady()) {
+      if (attempt < 120) setTimeout(() => loadPlannerEnhancements(attempt + 1), 100);
+      else console.warn("Planner enhancements skipped because the base app did not finish booting.");
+      return;
+    }
     if (!document.querySelector('script[data-planner-enhancements]')) {
       const planner = document.createElement("script");
-      planner.src = "planner-enhancements.js?v=20260811-2";
+      planner.src = "planner-enhancements.js?v=20260811-3";
       planner.dataset.plannerEnhancements = "true";
       document.body.append(planner);
     }
     if (!document.querySelector('script[data-planner-custom-types]')) {
       const types = document.createElement("script");
-      types.src = "planner-custom-types.js?v=20260811-2";
+      types.src = "planner-custom-types.js?v=20260811-3";
       types.dataset.plannerCustomTypes = "true";
       document.body.append(types);
     }
-  }, { once: true });
+  }
+
+  window.addEventListener("load", () => loadPlannerEnhancements(), { once: true });
 })();
