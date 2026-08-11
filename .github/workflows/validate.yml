@@ -23,3 +23,5 @@ jobs:
         run: python -m json.tool data/hokkaido_places_master.json > /dev/null && python -m json.tool data/candidate_locations.json > /dev/null && python -m json.tool data/research_batches_level1.json > /dev/null
       - name: Check JavaScript syntax
         run: node --check web/data-adapter.js && node --check web/app.js
+      - name: Test NAVITIME route adapter
+        run: node scripts/test_navitime_adapter.mjs

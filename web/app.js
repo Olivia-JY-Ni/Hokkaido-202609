@@ -1,4 +1,6 @@
 const STORAGE_KEY = "hokkaido-trip-planner-v2";
+const NAVITIME_KEY_STORAGE = "hokkaido-navitime-rapidapi-key";
+const NAVITIME_HOST = "navitime-route-totalnavi.p.rapidapi.com";
 const state = {
   candidates: [], catalog: [], areas: [], view: "areas", selectedAreaId: null,
   selectedCandidateId: null,
@@ -39,6 +41,11 @@ const ROUTE_MODES = {
   CUSTOM: { label: "自定义交通", icon: "🚌" },
 };
 const TRANSIT_MODE_LABELS = { BUS: "巴士", SUBWAY: "地铁", TRAIN: "列车", LIGHT_RAIL: "轻轨", RAIL: "轨道交通", FERRY: "渡轮" };
+const NAVITIME_MOVE_LABELS = {
+  domestic_flight: "航空", superexpress_train: "新干线", sleeper_ultraexpress: "卧铺特急",
+  ultraexpress_train: "特急", express_train: "急行", rapid_train: "快速", semiexpress_train: "有料列车",
+  local_train: "普通列车", shuttle_bus: "空港巴士", local_bus: "巴士", highway_bus: "高速巴士", ferry: "渡轮",
+};
 const unknown = value => window.ResearchDataAdapter.unknown(value);
 
 function esc(value) {
@@ -52,6 +59,22 @@ function shown(value, fallback = "未研究") {
   return String(value);
 }
 function known(value) { return !unknown(value); }
+function navitimeApiKey() { return sessionStorage.getItem(NAVITIME_KEY_STORAGE) || localStorage.getItem(NAVITIME_KEY_STORAGE) || ""; }
+function setNavitimeApiKey(value) {
+  const key = String(value || "").trim();
+  if (key) localStorage.setItem(NAVITIME_KEY_STORAGE, key); else localStorage.removeItem(NAVITIME_KEY_STORAGE);
+  sessionStorage.removeItem(NAVITIME_KEY_STORAGE);
+  renderNavitimeConnection();
+}
+function renderNavitimeConnection() {
+  const connected = Boolean(navitimeApiKey()); const box = $("navitimeConnection"); if (!box) return;
+  box.classList.toggle("connected", connected);
+  $("navitimeConnectionStatus").textContent = connected ? "已连接 · 每月最多 500 次" : "尚未连接 · 每月 500 次";
+  $("toggleNavitimeSettings").textContent = connected ? "设置" : "连接";
+}
+function openNavitimeSettings() {
+  $("navitimeSettings").hidden = false; $("navitimeApiKey").value = ""; $("navitimeApiKey").focus();
+}
 function friendlyTiming(value) {
   return ({ uncertain: "日期仍待确认", peak_window: "正值最佳时间", outside_best_window: "不在最佳时间", first_half: "行程前半段", second_half: "行程后半段", middle: "行程中段" })[value] || (value === "unknown" ? null : value);
 }
@@ -595,6 +618,78 @@ function serializeRestRouteOption(route, index) {
     segments, walkingMillis, transfers: Math.max(0,segments.length - 1), departureTime: segments[0]?.departureTime || "", arrivalTime: segments.at(-1)?.arrivalTime || "",
     warnings: (route.warnings || []).filter(Boolean) };
 }
+function navitimeShapePath(shapes) {
+  const points = [];
+  const collect = coordinates => {
+    if (!Array.isArray(coordinates)) return;
+    if (coordinates.length >= 2 && Number.isFinite(Number(coordinates[0])) && Number.isFinite(Number(coordinates[1]))) {
+      points.push({ lat: Number(coordinates[1]), lng: Number(coordinates[0]) }); return;
+    }
+    coordinates.forEach(collect);
+  };
+  (shapes?.features || []).forEach(feature => collect(feature?.geometry?.coordinates));
+  return points.filter((point,index) => !index || point.lat !== points[index - 1].lat || point.lng !== points[index - 1].lng);
+}
+function navitimeFareText(move) {
+  const reference = move?.reference_fare || {};
+  const amount = Number(reference.lowest_total_ic ?? reference.lowest_total_ticket ?? move?.fare?.unit_48 ?? move?.fare?.unit_0);
+  return Number.isFinite(amount) ? new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY", maximumFractionDigits: 0 }).format(amount) : "";
+}
+function navitimeCallingStops(value) {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.items)) return value.items;
+  return [];
+}
+function navitimeSegment(section, sections, index) {
+  if (section.type !== "move" || section.move === "walk" || !section.transport) return null;
+  const transport = section.transport || {};
+  const before = [...sections.slice(0,index)].reverse().find(item => item.type === "point") || {};
+  const after = sections.slice(index + 1).find(item => item.type === "point") || {};
+  const callingStops = navitimeCallingStops(transport.calling_at);
+  const destination = transport.destination || transport.links?.[0]?.destination || {};
+  const moveLabel = NAVITIME_MOVE_LABELS[section.move] || transport.type || "公共交通";
+  return {
+    mode: section.move === "shuttle_bus" ? "BUS" : (section.move === "domestic_flight" ? "AIRPLANE" : "RAIL"),
+    vehicle: moveLabel, line: transport.self_name || section.line_name || transport.name || moveLabel,
+    lineName: transport.name || section.line_name || "", color: /^#[0-9a-f]{6}$/i.test(transport.color || "") ? transport.color : "#0068b7",
+    departureStop: before.name || "", arrivalStop: after.name || "", headsign: destination.name || "",
+    departureTime: section.from_time || "", arrivalTime: section.to_time || "", stopCount: callingStops.length,
+    headwayMillis: 0, agencies: [transport.company?.name].filter(Boolean), durationMillis: Number(section.time || 0) * 60000,
+  };
+}
+function serializeNavitimeRouteOption(route,index) {
+  const summary = route.summary?.move || {}; const sections = route.sections || [];
+  const segments = sections.map((section,sectionIndex) => navitimeSegment(section,sections,sectionIndex)).filter(Boolean);
+  const walkingMillis = sections.filter(section => section.type === "move" && section.move === "walk").reduce((sum,section) => sum + Number(section.time || 0) * 60000,0);
+  const duration = Number(summary.time || 0) * 60000; const distance = Number(summary.distance || 0);
+  return {
+    index, provider: "navitime", travelMode: "TRANSIT", description: segments.map(segment => segment.line).join(" → "),
+    distanceMeters: distance, durationMillis: duration, durationText: duration ? compactDuration(duration) : "",
+    distanceText: distance ? compactDistance(distance) : "", fare: navitimeFareText(summary), path: navitimeShapePath(route.shapes),
+    segments, walkingMillis, transfers: Number.isFinite(Number(summary.transit_count)) ? Number(summary.transit_count) : Math.max(0,segments.length - 1),
+    departureTime: summary.from_time || segments[0]?.departureTime || "", arrivalTime: summary.to_time || segments.at(-1)?.arrivalTime || "", warnings: [],
+  };
+}
+async function computeNavitimeTransitRoutes(origin,destination) {
+  const apiKey = navitimeApiKey(); if (!apiKey) throw new Error("NAVITIME_KEY_REQUIRED");
+  const params = new URLSearchParams({
+    start: `${origin.lat},${origin.lon}`, goal: `${destination.lat},${destination.lon}`,
+    [state.routeDraft.timeMode === "arrival" ? "goal_time" : "start_time"]: `${state.routeDraft.dateTime}:00`,
+    datum: "wgs84", coord_unit: "degree", shape: "true", options: "railway_calling_at",
+    order: state.routeDraft.transitPreference === "FEWER_TRANSFERS" ? "transit" : (state.routeDraft.transitPreference === "LESS_WALKING" ? "walk_distance" : "time_optimized"),
+  });
+  const selectedMode = state.routeDraft.transitModes[0];
+  if (selectedMode === "RAIL") params.set("unuse", "domestic_flight.shuttle_bus");
+  if (selectedMode === "BUS") params.set("unuse", "domestic_flight.superexpress_train.sleeper_ultraexpress.ultraexpress_train.express_train.rapid_train.semiexpress_train.local_train");
+  const response = await fetch(`https://${NAVITIME_HOST}/route_transit?${params}`, { headers: { "X-RapidAPI-Key": apiKey, "X-RapidAPI-Host": NAVITIME_HOST, Accept: "application/json" } });
+  let payload = {}; try { payload = await response.json(); } catch (_) { /* handled by status below */ }
+  if (!response.ok) {
+    if ([401,403].includes(response.status)) throw new Error("NAVITIME_KEY_INVALID");
+    if (response.status === 429) throw new Error("NAVITIME_QUOTA_EXHAUSTED");
+    throw new Error(payload?.message || payload?.error?.message || `NAVITIME_HTTP_${response.status}`);
+  }
+  return (payload.items || []).map(serializeNavitimeRouteOption).filter(option => option.durationMillis || option.segments.length);
+}
 async function computeTransitRoutesREST(origin,destination,time) {
   const apiKey = window.GOOGLE_MAPS_CONFIG?.apiKey; if (!apiKey) return [];
   const body = { origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lon } } },
@@ -647,8 +742,31 @@ function routeRequestDate() { return japanDateFromInput(state.routeDraft.dateTim
 async function searchRoutes() {
   const { origin,destination,travelMode } = state.routeDraft;
   if (!origin || !destination) { state.routeStatus = "error"; renderRoutePlanner("请先选择明确的起点和终点"); return; }
-  if (mapProvider !== "google") { state.routeStatus = "error"; renderRoutePlanner("Google 路线服务暂不可用，请稍后重试"); return; }
   const requestId = ++state.routeRequestId; state.routeStatus = "loading"; state.routeOptions = []; renderRoutePlanner();
+  if (travelMode === "TRANSIT") {
+    if (!navitimeApiKey()) {
+      state.routeStatus = "error"; openNavitimeSettings(); renderRoutePlanner("请先连接 NAVITIME 免费额度，再搜索公共交通"); return;
+    }
+    try {
+      state.routeOptions = await computeNavitimeTransitRoutes(origin,destination);
+      if (requestId !== state.routeRequestId) return;
+      if (state.routeOptions.length) {
+        state.selectedRouteOption = 0; state.routeStatus = "ready"; state.routeDetailsOpen = new Set();
+        renderRoutePlanner(); renderMap({ fit: true }); return;
+      }
+    } catch (navitimeError) {
+      const code = navitimeError?.message || String(navitimeError);
+      console.warn("NAVITIME route search unavailable:", code);
+      if (requestId !== state.routeRequestId) return;
+      if (code === "NAVITIME_KEY_INVALID") {
+        state.routeStatus = "error"; openNavitimeSettings(); renderRoutePlanner("NAVITIME Key 无效或尚未启用 Route(totalnavi) Basic"); return;
+      }
+      if (code === "NAVITIME_QUOTA_EXHAUSTED") {
+        state.routeStatus = "error"; renderRoutePlanner("NAVITIME 本月 500 次免费额度已用完"); return;
+      }
+    }
+  }
+  if (mapProvider !== "google") { state.routeStatus = "error"; renderRoutePlanner(travelMode === "TRANSIT" ? "NAVITIME 没有返回路线，Google 回退服务也暂不可用" : "Google 路线服务暂不可用，请稍后重试"); return; }
   try {
     const { Route } = await google.maps.importLibrary("routes");
     const request = { origin: routeWaypoint(origin), destination: routeWaypoint(destination), travelMode,
@@ -690,14 +808,15 @@ async function searchRoutes() {
 function selectRouteOption(index, { fit = false } = {}) { if (!state.routeOptions[index]) return; state.selectedRouteOption = index; renderRoutePlanner(); renderMap({ fit }); }
 function routeSequence(option) { return option.segments.length ? option.segments.map(segment => segment.line).join(" → ") : ROUTE_MODES[option.travelMode || state.routeDraft.travelMode]?.label || "路线"; }
 function renderTransitTimeline(option) {
-  if (!option.segments.length) return `<div class="route-no-segments">${state.routeDraft.travelMode === "TRANSIT" ? "Google 未提供分段班次资料" : "选择路线后会在地图上高亮完整路径"}</div>`;
+  if (!option.segments.length) return `<div class="route-no-segments">${state.routeDraft.travelMode === "TRANSIT" ? `${option.provider === "navitime" ? "NAVITIME" : "Google"} 未提供分段班次资料` : "选择路线后会在地图上高亮完整路径"}</div>`;
   return `<div class="transit-timeline">${option.segments.map(segment => `<div class="transit-segment"><span class="segment-line" style="background:${esc(segment.color)}">${esc(segment.line)}</span><div><strong>${esc(timeLabel(segment.departureTime))} ${esc(segment.departureStop)}</strong><p>${esc(segment.vehicle)}${segment.headsign ? ` · 开往 ${esc(segment.headsign)}` : ""}${segment.stopCount ? ` · ${esc(segment.stopCount)} 站` : ""}</p><small>${esc(timeLabel(segment.arrivalTime))} 到达 ${esc(segment.arrivalStop)}${segment.headwayMillis ? ` · 约每 ${esc(compactDuration(segment.headwayMillis))} 一班` : ""}${segment.agencies.length ? ` · ${esc(segment.agencies.join(" / "))}` : ""}</small></div></div>`).join("")}</div>`;
 }
 function renderRouteOption(option,index) {
   const selected = index === state.selectedRouteOption; const expanded = state.routeDetailsOpen.has(index);
   const optionMode = option.travelMode || state.routeDraft.travelMode; const mode = ROUTE_MODES[optionMode] || ROUTE_MODES.TRANSIT;
-  const optionLabel = option.custom ? `${routeSequence(option)} · 自定义` : `${mode.label}方案 ${index + 1}`;
-  return `<article class="route-option${selected ? " selected" : ""}${option.custom ? " custom" : ""}" data-route-option-card="${index}"><button class="route-option-main" type="button" data-select-route-option="${index}"><span class="route-radio">${selected ? "●" : "○"}</span><span class="route-option-copy"><span class="route-option-times"><strong>${esc(option.durationText || compactDuration(option.durationMillis))}</strong>${option.departureTime && option.arrivalTime ? `<b>${esc(timeLabel(option.departureTime).split(" ").at(-1))}—${esc(timeLabel(option.arrivalTime).split(" ").at(-1))}</b>` : ""}</span><span class="route-sequence">${esc(optionLabel)}</span><span class="route-metrics"><em>${mode.icon} ${esc(mode.label)}</em><em>${option.distanceText || compactDistance(option.distanceMeters)}</em>${optionMode === "TRANSIT" ? `<em>${option.transfers} 次换乘</em><em>${option.walkingMillis ? `步行 ${esc(compactDuration(option.walkingMillis))}` : "少量步行"}</em>` : ""}</span></span><span class="route-fare ${option.fare ? "" : "missing"}">${esc(option.fare || (optionMode === "WALKING" || optionMode === "BICYCLING" ? "免费" : "费用未提供"))}</span></button><button class="route-detail-toggle" type="button" data-toggle-route-details="${index}" aria-expanded="${expanded}">${expanded ? "收起班次并返回地图" : "班次详情"}</button>${expanded ? `<div class="route-option-details">${renderTransitTimeline(option)}${option.custom && option.customStops ? `<p class="custom-stops"><strong>经停：</strong>${esc(option.customStops)}</p>` : ""}${option.custom && option.frequency ? `<p class="custom-stops"><strong>班次：</strong>${esc(option.frequency)}</p>` : ""}${option.warnings.length ? `<p class="route-warning">${esc(option.warnings.join("；"))}</p>` : ""}</div>` : ""}</article>`;
+  const isNavitime = option.provider === "navitime";
+  const optionLabel = option.custom ? `${routeSequence(option)} · 自定义` : (isNavitime ? routeSequence(option) : `${mode.label}方案 ${index + 1}`);
+  return `<article class="route-option${selected ? " selected" : ""}${option.custom ? " custom" : ""}${isNavitime ? " navitime" : ""}" data-route-option-card="${index}"><button class="route-option-main" type="button" data-select-route-option="${index}"><span class="route-radio">${selected ? "●" : "○"}</span><span class="route-option-copy"><span class="route-option-times"><strong>${esc(option.durationText || compactDuration(option.durationMillis))}</strong>${option.departureTime && option.arrivalTime ? `<b>${esc(timeLabel(option.departureTime).split(" ").at(-1))}—${esc(timeLabel(option.arrivalTime).split(" ").at(-1))}</b>` : ""}</span><span class="route-sequence">${esc(optionLabel)}</span>${isNavitime ? '<em class="route-provider-tag">NAVITIME 免费版</em>' : ""}<span class="route-metrics"><em>${mode.icon} ${esc(mode.label)}</em><em>${option.distanceText || compactDistance(option.distanceMeters)}</em>${optionMode === "TRANSIT" ? `<em>${option.transfers} 次换乘</em><em>${option.walkingMillis ? `步行 ${esc(compactDuration(option.walkingMillis))}` : "少量步行"}</em>` : ""}</span></span><span class="route-fare ${option.fare ? "" : "missing"}">${esc(option.fare || (optionMode === "WALKING" || optionMode === "BICYCLING" ? "免费" : "费用未提供"))}</span></button><button class="route-detail-toggle" type="button" data-toggle-route-details="${index}" aria-expanded="${expanded}">${expanded ? "收起班次并返回地图" : "班次详情"}</button>${expanded ? `<div class="route-option-details">${renderTransitTimeline(option)}${option.custom && option.customStops ? `<p class="custom-stops"><strong>经停：</strong>${esc(option.customStops)}</p>` : ""}${option.custom && option.frequency ? `<p class="custom-stops"><strong>班次：</strong>${esc(option.frequency)}</p>` : ""}${option.warnings.length ? `<p class="route-warning">${esc(option.warnings.join("；"))}</p>` : ""}</div>` : ""}</article>`;
 }
 function straightLineDistance(a,b) {
   const radians = value => value * Math.PI / 180; const earth = 6371000;
@@ -743,6 +862,12 @@ function openCustomRouteEditor() {
   }
   $("customRoutePanel").hidden = false; $("customRouteName").focus();
 }
+function startBlankCustomRouteRecord() {
+  $("customRouteName").value = ""; $("customRouteType").value = "TRAIN"; $("customRouteCost").value = "";
+  $("customDepartureTime").value = state.routeDraft.dateTime; $("customArrivalTime").value = "";
+  $("customFrequency").value = ""; $("customStops").value = ""; $("customRouteNotes").value = "";
+  $("customRoutePanel").hidden = false; $("customRouteName").focus();
+}
 function renderSavedRoutes() {
   $("savedRouteCount").textContent = state.savedRoutes.length; $("savedRoutesHint").textContent = `${state.savedRoutes.length} 条`;
   $("savedRoutesList").innerHTML = state.savedRoutes.length ? state.savedRoutes.map(route => {
@@ -752,23 +877,31 @@ function renderSavedRoutes() {
 }
 function renderRoutePlanner(message = "") {
   document.body.classList.toggle("route-details-visible", state.view === "routes" && state.routeDetailsOpen.size > 0);
+  renderNavitimeConnection();
+  const isTransitMode = state.routeDraft.travelMode === "TRANSIT";
+  $("navitimeConnection").hidden = !isTransitMode; if (!isTransitMode) $("navitimeSettings").hidden = true;
   document.querySelectorAll("[data-route-mode]").forEach(button => button.classList.toggle("active", button.dataset.routeMode === state.routeDraft.travelMode));
   document.querySelectorAll("[data-transit-mode]").forEach(button => button.classList.toggle("active", button.dataset.transitMode === (state.routeDraft.transitModes[0] || "")));
-  $("transitFilters").hidden = state.routeDraft.travelMode !== "TRANSIT";
+  $("transitFilters").hidden = !isTransitMode;
   $("routeTimeMode").querySelector('option[value="arrival"]').disabled = state.routeDraft.travelMode !== "TRANSIT";
   $("routeTimeMode").disabled = state.routeDraft.travelMode === "WALKING" || state.routeDraft.travelMode === "BICYCLING";
   $("routeDateTime").disabled = state.routeDraft.travelMode === "WALKING" || state.routeDraft.travelMode === "BICYCLING";
+  $("searchRoutes").textContent = state.routeDraft.travelMode === "TRANSIT" ? "搜索 NAVITIME 路线" : "搜索 Google 路线";
   if (state.routeStatus === "loading") $("routeSearchStatus").innerHTML = '<span class="route-spinner"></span><strong>正在比较可用路线与班次…</strong>';
   else if (message) $("routeSearchStatus").innerHTML = `<strong>${esc(message)}</strong>`;
   else if (state.routeStatus === "error") $("routeSearchStatus").innerHTML = '<strong>暂时无法取得路线，请检查地点或时间后重试</strong>';
-  else if (state.routeStatus === "empty" && state.routeDraft.travelMode === "TRANSIT") $("routeSearchStatus").innerHTML = '<strong>Google 路线接口没有返回这段公共交通</strong><small>可试前后 30 分钟；若 Google Maps 网站有路线但接口没有，请用“自定义路线”记录 JR、巴士、观光巴士或渡轮。</small>';
+  else if (state.routeStatus === "empty" && state.routeDraft.travelMode === "TRANSIT") $("routeSearchStatus").innerHTML = '<strong>NAVITIME 与 Google 都没有返回这段公共交通</strong><small>免费版不含地方巴士、高速巴士和轮渡，可用“自定义路线”记录。</small>';
   else if (state.routeStatus === "empty") $("routeSearchStatus").innerHTML = '<strong>这个时间没有找到可用路线，请调整地点或时间</strong>';
-  else if (state.routeOptions.length) $("routeSearchStatus").innerHTML = `<strong>找到 ${state.routeOptions.length} 个方案 · 点击卡片即可在地图比较</strong><small>票价仅在 Google 能确定完整行程时显示</small>`;
+  else if (state.routeOptions.length) {
+    const provider = state.routeOptions.some(option => option.provider === "navitime") ? "NAVITIME" : (state.routeOptions.every(option => option.custom) ? "自定义" : "Google");
+    $("routeSearchStatus").innerHTML = `<strong>${provider} 找到 ${state.routeOptions.length} 个方案 · 点击卡片即可在地图比较</strong><small>${provider === "NAVITIME" ? "免费版结果仅供当次查看" : "票价以运营方最终公布为准"}</small>`;
+  }
   else $("routeSearchStatus").innerHTML = "";
   $("routeResults").innerHTML = state.routeOptions.map(renderRouteOption).join("");
   const showShift = state.routeDraft.travelMode === "TRANSIT" && ["ready","empty"].includes(state.routeStatus);
   $("routeTimeShift").hidden = !showShift; $("routeTimeShiftLabel").textContent = state.routeDraft.timeMode === "arrival" ? "按到达时间" : "按出发时间";
-  const option = currentRouteOption(); $("routeSavePanel").hidden = !option;
+  const option = currentRouteOption(); const navitimeOption = option?.provider === "navitime";
+  $("routeSavePanel").hidden = !option || navitimeOption; $("navitimeSaveNotice").hidden = !navitimeOption;
   $("toggleCustomRoute").textContent = option?.custom && state.activeSavedRouteId ? "✎ 编辑自定义路线" : "＋ 自定义路线";
   if (option) {
     const active = routeById(state.activeSavedRouteId); $("saveSelectedRoute").textContent = active ? "更新已保存路线" : "保存到地图和行程";
@@ -779,6 +912,7 @@ function renderRoutePlanner(message = "") {
 }
 function saveSelectedRoute() {
   const option = currentRouteOption(); if (!option) return;
+  if (option.provider === "navitime") return showToast("NAVITIME 免费版结果不能直接保存，请手动记录为自定义路线");
   const existing = routeById(state.activeSavedRouteId); const id = existing?.id || `route-${Date.now()}`;
   const saved = { id, title: $("routeTitle").value.trim() || `${state.routeDraft.origin.name} → ${state.routeDraft.destination.name}`,
     origin: structuredClone(state.routeDraft.origin), destination: structuredClone(state.routeDraft.destination), travelMode: option.travelMode || state.routeDraft.travelMode, queryTravelMode: state.routeDraft.travelMode,
@@ -1122,6 +1256,14 @@ function setupInteractions() {
   $("transitFilters").addEventListener("click", event => { const button = event.target.closest("[data-transit-mode]"); if (!button) return; state.routeDraft.transitModes = button.dataset.transitMode ? [button.dataset.transitMode] : []; state.routeOptions = []; state.routeStatus = "idle"; renderRoutePlanner(); renderMap(); });
   $("transitPreference").addEventListener("change", event => { state.routeDraft.transitPreference = event.target.value; state.routeOptions = []; state.routeStatus = "idle"; renderRoutePlanner(); renderMap(); });
   $("searchRoutes").addEventListener("click", () => void searchRoutes());
+  $("toggleNavitimeSettings").addEventListener("click", openNavitimeSettings);
+  $("closeNavitimeSettings").addEventListener("click", () => { $("navitimeSettings").hidden = true; });
+  $("saveNavitimeKey").addEventListener("click", () => {
+    const key = $("navitimeApiKey").value.trim(); if (!key) return showToast("请粘贴 RapidAPI Key");
+    setNavitimeApiKey(key); $("navitimeApiKey").value = ""; $("navitimeSettings").hidden = true; state.routeStatus = "idle"; renderRoutePlanner(); showToast("NAVITIME 已连接");
+  });
+  $("clearNavitimeKey").addEventListener("click", () => { setNavitimeApiKey(""); $("navitimeApiKey").value = ""; state.routeOptions = []; state.routeStatus = "idle"; renderRoutePlanner(); renderMap(); showToast("已清除 NAVITIME 连接"); });
+  $("recordNavitimeAsCustom").addEventListener("click", startBlankCustomRouteRecord);
   $("routeTimeShift").addEventListener("click", event => { const button = event.target.closest("[data-shift-route-time]"); if (button) shiftRouteTime(Number(button.dataset.shiftRouteTime)); });
   $("routeResults").addEventListener("click", event => {
     const detail = event.target.closest("[data-toggle-route-details]"); if (detail) { const index = Number(detail.dataset.toggleRouteDetails); state.routeDetailsOpen.has(index) ? state.routeDetailsOpen.delete(index) : state.routeDetailsOpen.add(index); return renderRoutePlanner(); }

@@ -7,7 +7,7 @@
   <meta name="description" content="Hokkaido 2026 September Trip 地区与候选地点旅行规划地图">
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=20260811-9">
+  <link rel="stylesheet" href="styles.css?v=20260811-12">
 </head>
 <body>
   <header class="app-header">
@@ -70,14 +70,24 @@
             <div class="transit-mode-filter" aria-label="公共交通类型">
               <button type="button" data-transit-mode="" class="active">全部交通</button>
               <button type="button" data-transit-mode="RAIL">铁路优先</button>
-              <button type="button" data-transit-mode="BUS">巴士优先</button>
+              <button type="button" data-transit-mode="BUS">空港巴士</button>
             </div>
             <select id="transitPreference" aria-label="公共交通路线偏好"><option value="">推荐路线</option><option value="FEWER_TRANSFERS">较少换乘</option><option value="LESS_WALKING">较少步行</option></select>
           </div>
 
-          <div class="route-builder-actions"><button id="searchRoutes" class="route-search-button" type="button">搜索 Google 路线</button><button id="toggleCustomRoute" class="custom-route-button" type="button">＋ 自定义路线</button></div>
+          <div id="navitimeConnection" class="navitime-connection">
+            <span class="navitime-source-mark">N</span><span><strong>NAVITIME 免费版</strong><small id="navitimeConnectionStatus">尚未连接 · 每月 500 次</small></span><button id="toggleNavitimeSettings" type="button">连接</button>
+          </div>
+          <section id="navitimeSettings" class="navitime-settings" hidden>
+            <div class="navitime-settings-heading"><strong>连接 NAVITIME 免费额度</strong><button id="closeNavitimeSettings" type="button" aria-label="关闭 NAVITIME 设置">×</button></div>
+            <p>在 RapidAPI 启用 NAVITIME Route(totalnavi) Basic 后，把个人 API Key 粘贴到这里。密钥只保存在当前浏览器，不会写入公开代码。</p>
+            <label>RapidAPI Key<input id="navitimeApiKey" type="password" autocomplete="off" spellcheck="false" placeholder="粘贴 X-RapidAPI-Key"></label>
+            <div class="navitime-settings-actions"><a href="https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-route-totalnavi/pricing" target="_blank" rel="noreferrer">申请免费额度</a><button id="clearNavitimeKey" type="button">清除</button><button id="saveNavitimeKey" type="button">保存并连接</button></div>
+            <small>免费版覆盖铁路、航空和空港接驳；不含地方巴士、高速巴士及轮渡。它们继续使用“自定义路线”。</small>
+          </section>
+          <div class="route-builder-actions"><button id="searchRoutes" class="route-search-button" type="button">搜索 NAVITIME 路线</button><button id="toggleCustomRoute" class="custom-route-button" type="button">＋ 自定义路线</button></div>
           <section id="customRoutePanel" class="custom-route-panel" hidden>
-            <div class="custom-route-heading"><strong>Google 未收录的交通</strong><button id="closeCustomRoute" type="button" aria-label="关闭自定义路线">×</button></div>
+            <div class="custom-route-heading"><strong>自动查询未覆盖的交通</strong><button id="closeCustomRoute" type="button" aria-label="关闭自定义路线">×</button></div>
             <div class="custom-route-grid">
               <label class="wide">运营方 / 线路名<input id="customRouteName" type="text" placeholder="例如：北海道 Resort Liner 富良野号"></label>
               <label>交通类型<select id="customRouteType"><option value="TOUR_BUS">观光巴士</option><option value="BUS">巴士</option><option value="TRAIN">列车</option><option value="FERRY">渡轮</option><option value="SHUTTLE">接驳车</option><option value="CHARTER">包车</option><option value="OTHER">其他</option></select></label>
@@ -96,6 +106,7 @@
         <div id="routeSearchStatus" class="route-search-status" aria-live="polite"></div>
         <div id="routeTimeShift" class="route-time-shift" hidden><button type="button" data-shift-route-time="-30">‹ 早 30 分钟</button><span id="routeTimeShiftLabel"></span><button type="button" data-shift-route-time="30">晚 30 分钟 ›</button></div>
         <div id="routeResults" class="route-results"></div>
+        <div id="navitimeSaveNotice" class="navitime-save-notice" hidden><span>NAVITIME 免费版条款不允许保存接口结果。需要长期保留时，请人工记录为自定义路线。</span><button id="recordNavitimeAsCustom" type="button">记录自定义路线</button></div>
 
         <section id="routeSavePanel" class="route-save-panel" hidden>
           <div class="route-save-heading"><strong>保存所选方案</strong><span>费用可按实际票价补充</span></div>
@@ -189,6 +200,6 @@
   <script src="google-maps-config.js"></script>
   <script src="google-maps-loader.js?v=20260811-2"></script>
   <script src="data-adapter.js"></script>
-  <script src="app.js?v=20260811-7"></script>
+  <script src="app.js?v=20260811-8"></script>
 </body>
 </html>
