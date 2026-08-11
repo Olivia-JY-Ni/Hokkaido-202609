@@ -32,5 +32,6 @@ jobs:
           node --check web/google-maps-loader.js
           node --check web/planner-enhancements.js
           node --check web/planner-custom-types.js
+          node --check web/planner-runtime-fixes.js
       - name: Test NAVITIME route adapter
         run: node scripts/test_navitime_adapter.mjs
