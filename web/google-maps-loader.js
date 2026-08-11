@@ -32,7 +32,7 @@
 (() => {
   const css = document.createElement("link");
   css.rel = "stylesheet";
-  css.href = "planner-enhancements.css?v=20260811-3";
+  css.href = "planner-enhancements.css?v=20260811-4";
   document.head.append(css);
 
   function appReady() {
@@ -44,24 +44,23 @@
       return false;
     }
   }
+  function addScript(src, dataKey) {
+    if (document.querySelector(`script[data-${dataKey}]`)) return;
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = false;
+    script.dataset[dataKey.replace(/-([a-z])/g, (_,char) => char.toUpperCase())] = "true";
+    document.body.append(script);
+  }
   function loadPlannerEnhancements(attempt = 0) {
     if (!appReady()) {
       if (attempt < 120) setTimeout(() => loadPlannerEnhancements(attempt + 1), 100);
       else console.warn("Planner enhancements skipped because the base app did not finish booting.");
       return;
     }
-    if (!document.querySelector('script[data-planner-enhancements]')) {
-      const planner = document.createElement("script");
-      planner.src = "planner-enhancements.js?v=20260811-3";
-      planner.dataset.plannerEnhancements = "true";
-      document.body.append(planner);
-    }
-    if (!document.querySelector('script[data-planner-custom-types]')) {
-      const types = document.createElement("script");
-      types.src = "planner-custom-types.js?v=20260811-3";
-      types.dataset.plannerCustomTypes = "true";
-      document.body.append(types);
-    }
+    addScript("planner-enhancements.js?v=20260811-4", "planner-enhancements");
+    addScript("planner-custom-types.js?v=20260811-4", "planner-custom-types");
+    addScript("planner-runtime-fixes.js?v=20260811-4", "planner-runtime-fixes");
   }
 
   window.addEventListener("load", () => loadPlannerEnhancements(), { once: true });
