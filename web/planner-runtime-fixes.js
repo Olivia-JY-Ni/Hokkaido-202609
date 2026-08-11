@@ -80,10 +80,10 @@
       if (state.selectedCandidateId !== id) return;
       if (mapProvider === "google") {
         map.panTo({ lat: item.location.lat, lng: item.location.lon });
-        if (!Number.isFinite(map.getZoom?.()) || map.getZoom() < 12) map.setZoom(13);
+        if (!Number.isFinite(map.getZoom?.()) || map.getZoom() < 13) map.setZoom(13);
       } else if (mapProvider === "leaflet" || window.L) {
         const zoom = typeof map.getZoom === "function" ? map.getZoom() : 0;
-        if (zoom < 12) map.setView([item.location.lat, item.location.lon], 13, { animate: false });
+        if (zoom < 13) map.setView([item.location.lat, item.location.lon], 13, { animate: false });
         else map.panTo([item.location.lat, item.location.lon], { animate: false });
       }
     };
