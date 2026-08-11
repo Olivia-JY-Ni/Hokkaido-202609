@@ -1,5 +1,7 @@
 (() => {
   const JAPAN_TIME_ZONE = "Asia/Tokyo";
+  const ITINERARY_OBSERVER_OPTIONS = Object.freeze({ childList: true });
+  let connectorRefreshQueued = false;
 
   function hasExplicitZone(value) {
     return /(?:Z|[+-]\d{2}:?\d{2})$/i.test(String(value || ""));
@@ -53,19 +55,40 @@
 
   function routeByIdSafe(id) {
     if (typeof routeById === "function") return routeById(id);
-    return state?.savedRoutes?.find(route => route.id === id) || null;
+    return typeof state !== "undefined" ? state.savedRoutes?.find(route => route.id === id) || null : null;
+  }
+
+  function savedConnectorLabel(route) {
+    if (!route) return "";
+    const option = route.selectedOption || {};
+    const departure = plannerTimeFromValue(option.departureTime || route.dateTime);
+    const arrival = plannerTimeFromValue(option.arrivalTime);
+    const title = route.title || `${route.origin?.name || "起点"} → ${route.destination?.name || "终点"}`;
+    return `${departure}${arrival ? ` → ${arrival}` : ""}${departure || arrival ? " · " : ""}${title}`;
+  }
+
+  function setTextIfChanged(node, nextText) {
+    if (!node) return false;
+    const next = String(nextText ?? "");
+    if (node.textContent === next) return false;
+    node.textContent = next;
+    return true;
   }
 
   function refreshSavedConnectorTimes(root = document) {
     root.querySelectorAll?.(".planner-v2-connector.saved[data-itinerary-route]").forEach(button => {
       const route = routeByIdSafe(button.dataset.itineraryRoute);
       if (!route) return;
-      const option = route.selectedOption || {};
-      const departure = plannerTimeFromValue(option.departureTime || route.dateTime);
-      const arrival = plannerTimeFromValue(option.arrivalTime);
-      const title = route.title || `${route.origin?.name || "起点"} → ${route.destination?.name || "终点"}`;
-      const small = button.querySelector("small");
-      if (small) small.textContent = `${departure}${arrival ? ` → ${arrival}` : ""}${departure || arrival ? " · " : ""}${title}`;
+      setTextIfChanged(button.querySelector("small"), savedConnectorLabel(route));
+    });
+  }
+
+  function scheduleSavedConnectorRefresh(itinerary) {
+    if (connectorRefreshQueued) return;
+    connectorRefreshQueued = true;
+    queueMicrotask(() => {
+      connectorRefreshQueued = false;
+      refreshSavedConnectorTimes(itinerary);
     });
   }
 
@@ -102,8 +125,8 @@
 
     const itinerary = document.getElementById("itineraryList");
     if (itinerary) {
-      const observer = new MutationObserver(() => queueMicrotask(() => refreshSavedConnectorTimes(itinerary)));
-      observer.observe(itinerary, { childList: true, subtree: true });
+      const observer = new MutationObserver(() => scheduleSavedConnectorRefresh(itinerary));
+      observer.observe(itinerary, ITINERARY_OBSERVER_OPTIONS);
       refreshSavedConnectorTimes(itinerary);
     }
   }
@@ -122,6 +145,9 @@
       plannerTimeFromValue,
       addMinutesToLocalDateTime,
       connectionCustomTimes,
+      savedConnectorLabel,
+      setTextIfChanged,
+      ITINERARY_OBSERVER_OPTIONS,
     };
     if (document.readyState === "complete") init();
     else window.addEventListener("load", () => init(), { once: true });
