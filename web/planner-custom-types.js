@@ -43,12 +43,14 @@
       if (typeof renderAll === "function") renderAll({ fitMap: false });
     });
   }
-
-  window.addEventListener("load", () => {
+  function init() {
     ensureEditor();
     const dialog = document.getElementById("customCandidateDialog");
     if (dialog) new MutationObserver(() => { if (dialog.open) syncEditor(); }).observe(dialog, { attributes: true, attributeFilter: ["open"] });
-  }, { once: true });
+  }
+
+  if (document.readyState === "complete") init();
+  else window.addEventListener("load", init, { once: true });
 
   document.addEventListener("change", event => {
     if (event.target.matches("#plannerCandidateEntityType")) {
