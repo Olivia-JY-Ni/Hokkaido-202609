@@ -30,7 +30,11 @@
 })();
 
 (() => {
-  ["planner-enhancements.css?v=20260811-5", "planner-itinerary-ui.css?v=20260811-1"].forEach(href => {
+  [
+    "planner-enhancements.css?v=20260811-6",
+    "planner-itinerary-ui.css?v=20260811-2",
+    "planner-round2-regression-fixes.css?v=20260811-1",
+  ].forEach(href => {
     const css = document.createElement("link");
     css.rel = "stylesheet";
     css.href = href;
@@ -60,10 +64,11 @@
       else console.warn("Planner enhancements skipped because the base app did not finish booting.");
       return;
     }
-    addScript("planner-enhancements.js?v=20260811-5", "planner-enhancements");
-    addScript("planner-custom-types.js?v=20260811-5", "planner-custom-types");
-    addScript("planner-runtime-fixes.js?v=20260811-5", "planner-runtime-fixes");
-    addScript("planner-itinerary-ui.js?v=20260811-1", "planner-itinerary-ui");
+    addScript("planner-enhancements.js?v=20260811-6", "planner-enhancements");
+    addScript("planner-custom-types.js?v=20260811-6", "planner-custom-types");
+    addScript("planner-runtime-fixes.js?v=20260811-6", "planner-runtime-fixes");
+    addScript("planner-itinerary-ui.js?v=20260811-2", "planner-itinerary-ui");
+    addScript("planner-round2-regression-fixes.js?v=20260811-1", "planner-round2-regression-fixes");
   }
 
   window.addEventListener("load", () => loadPlannerEnhancements(), { once: true });
