@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-globalThis.window = {};
+globalThis.window = { addEventListener() {} };
 globalThis.document = { readyState: "loading", addEventListener() {} };
 
 await import("../web/planner-round2-regression-fixes.js");
