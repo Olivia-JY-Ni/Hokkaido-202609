@@ -30,17 +30,20 @@
   function escHtml(value) {
     return String(value ?? "").replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[char]));
   }
+  function utcDayNumber(value) {
+    const [year,month,day] = String(value).split("-").map(Number);
+    return Date.UTC(year,month - 1,day);
+  }
   function dateRange() {
     const result = [];
-    const start = new Date(`${TRIP_START}T00:00:00+09:00`);
-    const end = new Date(`${TRIP_END}T00:00:00+09:00`);
-    for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) result.push(new Date(cursor).toISOString().slice(0,10));
+    const start = utcDayNumber(TRIP_START);
+    const end = utcDayNumber(TRIP_END);
+    for (let cursor = start; cursor <= end; cursor += 86400000) result.push(new Date(cursor).toISOString().slice(0,10));
     return result;
   }
   function dayLabel(date) {
-    const parsed = new Date(`${date}T12:00:00+09:00`);
     const [,m,d] = date.split("-");
-    return `${Number(m)}月${Number(d)}日 · 周${WEEKDAYS[parsed.getUTCDay()]}`;
+    return `${Number(m)}月${Number(d)}日 · 周${WEEKDAYS[new Date(utcDayNumber(date)).getUTCDay()]}`;
   }
   function timeFromISO(value) {
     const match = String(value || "").match(/T(\d{2}:\d{2})/);
@@ -172,7 +175,7 @@
     rendering = true;
     host.dataset.itineraryDensity = prefs.density;
     host.innerHTML = dates.length ? dates.map(renderDay).join("") :
-      '<div class="planner-itinerary-empty"><strong>还没有安排具体日期</strong><span>在地点详情里填写“我什么时候去”，保存的交通也会自动出现在这里。</span></div>';
+      '<div class="planner-itinerary-empty planner-v2-empty"><strong>还没有安排具体日期</strong><span>在地点详情里填写“我什么时候去”，保存的交通也会自动出现在这里。</span></div>';
     document.querySelectorAll("[data-density]").forEach(button => button.classList.toggle("active", button.dataset.density === prefs.density));
     rendering = false;
   }
@@ -180,7 +183,7 @@
     const host = document.getElementById("itineraryList");
     if (!host || itineraryObserver) return;
     itineraryObserver = new MutationObserver(() => {
-      if (rendering || host.querySelector(".planner-v2-day")) return;
+      if (rendering || host.querySelector(".planner-v2-day,.planner-v2-empty")) return;
       queueMicrotask(renderEnhancedItinerary);
     });
     itineraryObserver.observe(host, { childList:true });
@@ -238,10 +241,11 @@
     if (!panel) return;
     const prefs = readPrefs();
     const days = dateRange();
+    const dayMode = Boolean(prefs.selectedDay);
     panel.innerHTML = `<div class="planner-layer-heading"><strong>地图图层</strong><button type="button" data-close-layers>×</button></div>
       <label class="planner-layer-check"><input type="checkbox" data-layer-areas ${state.showAreas ? "checked" : ""}><span>⭐ 地区</span></label>
-      <label class="planner-layer-check"><input type="checkbox" data-layer-planned ${prefs.showPlanned ? "checked" : ""}><span>已安排行程地点</span></label>
-      <label class="planner-layer-check"><input type="checkbox" data-layer-unplanned ${prefs.showUnplanned ? "checked" : ""}><span>未安排地点</span></label>
+      <label class="planner-layer-check"><input type="checkbox" data-layer-planned ${prefs.showPlanned ? "checked" : ""} ${dayMode ? "disabled" : ""}><span>已安排行程地点</span></label>
+      <label class="planner-layer-check"><input type="checkbox" data-layer-unplanned ${prefs.showUnplanned ? "checked" : ""} ${dayMode ? "disabled" : ""}><span>未安排地点</span></label>
       <div class="planner-layer-section"><span>日期</span><div class="planner-day-chips"><button type="button" data-layer-day="" class="${prefs.selectedDay ? "" : "active"}">全部</button>${days.map(date => `<button type="button" data-layer-day="${date}" class="${prefs.selectedDay === date ? "active" : ""}">${Number(date.slice(-2))}</button>`).join("")}</div></div>
       <div class="planner-layer-section"><span>类型</span><div class="planner-type-checks">${availableTypes().map(([type,label]) => `<label><input type="checkbox" data-layer-type="${escHtml(type)}" ${prefs.excludedTypes.includes(type) ? "" : "checked"}><span>${escHtml(label)}</span></label>`).join("")}</div></div>
       <button type="button" class="planner-layer-reset" data-layer-reset>重置图层</button>`;
@@ -304,7 +308,7 @@
       const connect = event.target.closest("[data-connect-from][data-connect-to]");
       if (connect) { openConnectionPlanner(connect.dataset.connectFrom,connect.dataset.connectTo,connect.dataset.connectDate); return; }
       const day = event.target.closest("[data-show-day]");
-      if (day) { writePrefs({ selectedDay:day.dataset.showDay, showPlanned:true, showUnplanned:false }); layerPanelOpen = false; refreshMapLayers(); return; }
+      if (day) { state.selectedAreaId = null; writePrefs({ selectedDay:day.dataset.showDay, showPlanned:true, showUnplanned:false }); layerPanelOpen = false; refreshMapLayers(); return; }
       if (event.target.closest("[data-add-day]")) {
         if (typeof switchView === "function") switchView("candidates");
         if (typeof showToast === "function") showToast("选择地点后，在详情里填写这一天的时间");
@@ -337,7 +341,7 @@
         return;
       }
       const layerDay = event.target.closest("[data-layer-day]");
-      if (layerDay) { writePrefs({ selectedDay:layerDay.dataset.layerDay }); refreshMapLayers(); return; }
+      if (layerDay) { if (layerDay.dataset.layerDay) state.selectedAreaId = null; writePrefs({ selectedDay:layerDay.dataset.layerDay }); refreshMapLayers(); return; }
       if (event.target.closest("[data-layer-reset]")) {
         writePrefs({ showPlanned:true, showUnplanned:true, selectedDay:"", excludedTypes:[] });
         state.showAreas = true; refreshMapLayers(); return;
