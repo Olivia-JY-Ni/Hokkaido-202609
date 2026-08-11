@@ -8,7 +8,13 @@ const state = {
   livePredictions: [], placesReady: false, searchSessionToken: null, searchRequestId: 0,
   legendOpen: false, nearbyAreaId: null, nearbyType: "tourist_attraction", nearbyPlaces: [],
   nearbyStatus: "idle", selectedNearbyPlaceId: null, placeDetails: new Map(), placeDetailsLoading: new Set(),
-  routeLegs: [], routeStatus: "idle", routeSignature: "", routeRequestId: 0,
+  savedRoutes: [], activeSavedRouteId: null, routeOptions: [], selectedRouteOption: 0,
+  routeStatus: "idle", routeRequestId: 0, routeSearchRequestId: 0, routeSearchTarget: null,
+  routeSearchPredictions: [], routeSearchSessionToken: null, routeDetailsOpen: new Set(),
+  routeDraft: {
+    origin: null, destination: null, travelMode: "TRANSIT", timeMode: "departure",
+    dateTime: "2026-09-05T09:00", transitModes: [], transitPreference: "",
+  },
 };
 const $ = id => document.getElementById(id);
 const CATEGORY_LABELS = {
@@ -27,6 +33,12 @@ const NEARBY_TYPES = {
   tourist_attraction: "景点", restaurant: "餐厅", cafe: "咖啡甜品", park: "公园",
   museum: "博物馆", spa: "温泉 / Spa", lodging: "住宿", transit_station: "车站", parking: "停车场",
 };
+const ROUTE_MODES = {
+  TRANSIT: { label: "公共交通", icon: "🚆" }, WALKING: { label: "步行", icon: "🚶" },
+  BICYCLING: { label: "骑行", icon: "🚲" }, DRIVING: { label: "驾车", icon: "🚗" },
+  CUSTOM: { label: "自定义交通", icon: "🚌" },
+};
+const TRANSIT_MODE_LABELS = { BUS: "巴士", SUBWAY: "地铁", TRAIN: "列车", LIGHT_RAIL: "轻轨", RAIL: "轨道交通", FERRY: "渡轮" };
 const unknown = value => window.ResearchDataAdapter.unknown(value);
 
 function esc(value) {
@@ -73,7 +85,7 @@ function areaById(id) { return state.areas.find(area => area.id === id); }
 function candidateById(id) { return state.candidates.find(candidate => candidate.id === id); }
 function areaForCandidate(id) { return state.areas.find(area => area.candidateIds.includes(id)) || null; }
 function candidatesForArea(id) { const area = areaById(id); return area ? area.candidateIds.map(candidateById).filter(Boolean) : []; }
-function routeLegTo(areaId) { return state.routeLegs.find(leg => leg.toId === areaId) || null; }
+function routeById(id) { return state.savedRoutes.find(route => route.id === id) || null; }
 function searchCandidateText(item) {
   return [item.id, item.name, item.names?.ja, item.names?.en, item.region, item.municipality, item.experience?.experience_summary]
     .filter(Boolean).join(" ").toLowerCase();
@@ -89,10 +101,17 @@ function loadUserState() {
       businessStatus: area.businessStatus || "", addressComponents: Array.isArray(area.addressComponents) ? area.addressComponents : [],
     })) : [];
     state.selectedAreaId = state.areas.some(area => area.id === saved.selectedAreaId) ? saved.selectedAreaId : null;
+    const googleRouteCutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    state.savedRoutes = Array.isArray(saved.savedRoutes) ? saved.savedRoutes.filter(route => route?.id && route.origin && route.destination && route.selectedOption)
+      .filter(route => route.selectedOption.custom || (route.updatedAt && new Date(route.updatedAt).getTime() >= googleRouteCutoff)) : [];
+    state.activeSavedRouteId = state.savedRoutes.some(route => route.id === saved.activeSavedRouteId) ? saved.activeSavedRouteId : null;
   } catch (_) { state.areas = []; state.selectedAreaId = null; }
 }
 function saveUserState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ areas: state.areas, selectedAreaId: state.selectedAreaId }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    areas: state.areas, selectedAreaId: state.selectedAreaId,
+    savedRoutes: state.savedRoutes, activeSavedRouteId: state.activeSavedRouteId,
+  }));
 }
 function fillCategorySelect(select) {
   Object.entries(CATEGORY_LABELS).forEach(([value, label]) => {
@@ -100,7 +119,7 @@ function fillCategorySelect(select) {
   });
 }
 
-let map, mapProvider = "leaflet", areaLayer, candidateLayer, routeLayer, previewLayer, nearbyLayer, searchTimer;
+let map, mapProvider = "leaflet", areaLayer, candidateLayer, routeLayer, previewLayer, nearbyLayer, searchTimer, routeSearchTimer;
 const areaMarkers = new Map();
 const candidateMarkers = new Map();
 function initLeafletMap() {
@@ -200,6 +219,50 @@ function mapCandidates() {
   if (state.view === "candidates") return filteredCandidates().filter(validCoordinates);
   return state.candidates.filter(validCoordinates);
 }
+function currentRouteOption() { return state.routeOptions[state.selectedRouteOption] || null; }
+function addRoutePolyline(path, { color = "#1a73e8", weight = 5, opacity = .8, dashed = false, zIndex = 1 } = {}, onClick) {
+  if (!Array.isArray(path) || path.length < 2) return;
+  if (mapProvider === "google") {
+    const line = new google.maps.Polyline({ path, map, strokeColor: color, strokeWeight: weight, strokeOpacity: opacity, zIndex });
+    if (onClick) line.addListener("click", onClick);
+    routeLayer.push(line);
+  } else {
+    const line = L.polyline(path.map(point => [point.lat,point.lng]), { color, weight, opacity, dashArray: dashed ? "7 8" : undefined });
+    if (onClick) line.on("click", onClick);
+    line.addTo(routeLayer);
+  }
+}
+function addRouteEndpointMarker(endpoint, label, color) {
+  if (!endpoint || !Number.isFinite(endpoint.lat) || !Number.isFinite(endpoint.lon)) return;
+  const position = { lat: endpoint.lat, lng: endpoint.lon };
+  if (mapProvider === "google") {
+    const marker = new google.maps.Marker({ position, map, title: endpoint.name,
+      zIndex: 1450, label: { text: label, color: "#fff", fontWeight: "700" },
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 12, fillColor: color, fillOpacity: 1, strokeColor: "#fff", strokeWeight: 2 } });
+    routeLayer.push(marker);
+  } else {
+    L.marker([endpoint.lat,endpoint.lon], { icon: L.divIcon({ className: "route-endpoint-marker", html: `<span style="background:${color}">${label}</span>`, iconSize: [28,28], iconAnchor: [14,14] }), zIndexOffset: 1400 }).addTo(routeLayer);
+  }
+}
+function renderRouteLayers() {
+  const current = currentRouteOption();
+  const currentPaths = state.view === "routes" ? state.routeOptions : [];
+  state.savedRoutes.forEach(route => {
+    if (route.id === state.activeSavedRouteId && current) return;
+    const active = route.id === state.activeSavedRouteId;
+    addRoutePolyline(route.selectedOption?.path, { color: active ? "#1a73e8" : "#5f6368", weight: active ? 6 : 3, opacity: active ? .88 : .32, dashed: Boolean(route.selectedOption?.custom), zIndex: active ? 20 : 2 }, () => activateSavedRoute(route.id));
+  });
+  currentPaths.forEach((option,index) => {
+    const selected = index === state.selectedRouteOption;
+    addRoutePolyline(option.path, { color: selected ? "#1a73e8" : "#6f8fbd", weight: selected ? 7 : 4, opacity: selected ? .92 : .42, dashed: Boolean(option.custom), zIndex: selected ? 40 : 15 }, () => selectRouteOption(index, { fit: true }));
+  });
+  const activeSaved = routeById(state.activeSavedRouteId);
+  const endpoints = current ? state.routeDraft : activeSaved;
+  if (endpoints?.origin && endpoints?.destination) {
+    addRouteEndpointMarker(endpoints.origin, "A", "#1a73e8");
+    addRouteEndpointMarker(endpoints.destination, "B", "#d93025");
+  }
+}
 function renderMap({ fit = false } = {}) {
   clearMapLayer(areaLayer); clearMapLayer(candidateLayer); clearMapLayer(routeLayer); clearMapLayer(previewLayer); clearMapLayer(nearbyLayer);
   areaMarkers.clear(); candidateMarkers.clear();
@@ -223,17 +286,8 @@ function renderMap({ fit = false } = {}) {
       areaMarkers.set(area.id, marker);
       if (!selected || isSelected) points.push({ lat: area.lat, lng: area.lon });
     });
-    if (!selected && state.areas.length > 1) {
-      const computedPaths = state.routeLegs.filter(leg => leg.path?.length > 1);
-      if (mapProvider === "google") {
-        if (computedPaths.length) computedPaths.forEach(leg => routeLayer.push(new google.maps.Polyline({ path: leg.path, map, strokeColor: "#1a73e8", strokeWeight: 5, strokeOpacity: .72 })));
-        else routeLayer.push(new google.maps.Polyline({ path: state.areas.map(area => ({ lat: area.lat, lng: area.lon })), map, strokeColor: "#1a73e8", strokeWeight: 3, strokeOpacity: .48 }));
-      } else {
-        if (computedPaths.length) computedPaths.forEach(leg => L.polyline(leg.path.map(point => [point.lat,point.lng]), { color: "#1a73e8", weight: 5, opacity: .72 }).addTo(routeLayer));
-        else L.polyline(state.areas.map(area => [area.lat, area.lon]), { color: "#1a73e8", weight: 3, opacity: .48, dashArray: "7 8" }).addTo(routeLayer);
-      }
-    }
   }
+  renderRouteLayers();
   const visibleCandidates = mapCandidates();
   visibleCandidates.forEach(item => {
     const color = COLORS[item.category] || "#687d86";
@@ -271,7 +325,8 @@ function renderMap({ fit = false } = {}) {
   renderLegend(visibleCandidates);
   if (fit) {
     const libraryPoints = visibleCandidates.filter(item => !String(item.id).startsWith("JP-")).map(item => ({ lat: item.location.lat, lng: item.location.lon }));
-    const focusPoints = state.view === "candidates" && !selected && libraryPoints.length ? libraryPoints : points;
+    const routeFocusPoints = currentRouteOption()?.path || routeById(state.activeSavedRouteId)?.selectedOption?.path || [];
+    const focusPoints = state.view === "routes" && routeFocusPoints.length ? routeFocusPoints : (state.view === "candidates" && !selected && libraryPoints.length ? libraryPoints : points);
     if (mapProvider === "google") {
       if (selected && visibleCandidates.length === 0 && selected.viewport) { map.fitBounds(selected.viewport, 72); }
       else if (selected && visibleCandidates.length === 0) { map.setCenter({ lat: selected.lat, lng: selected.lon }); map.setZoom(10); }
@@ -319,30 +374,14 @@ function areaCandidateRows(area) {
 }
 function renderTripRouteSummary() {
   const box = $("tripRouteSummary");
-  if (state.areas.length < 2) {
-    box.innerHTML = '<span class="route-icon">↗</span><span><strong>交通时间</strong><small>加入两个地区后自动计算驾车距离</small></span>';
-    return;
-  }
-  if (state.routeStatus === "loading") {
-    box.innerHTML = '<span class="route-spinner"></span><span><strong>正在计算地区间交通</strong><small>按当前行程顺序获取路线</small></span>';
-    return;
-  }
-  const ready = state.routeLegs.filter(leg => Number.isFinite(leg.distanceMeters));
-  if (ready.length) {
-    const totalDistance = ready.reduce((sum,leg) => sum + leg.distanceMeters, 0);
-    const totalDuration = ready.reduce((sum,leg) => sum + leg.durationMillis, 0);
-    box.innerHTML = `<span class="route-icon">🚗</span><span><strong>${esc(compactDuration(totalDuration))} · ${esc(compactDistance(totalDistance))}</strong><small>${ready.length} 段驾车路线${state.routeStatus === "partial" ? " · 部分路线暂不可用" : ""}</small></span><button data-refresh-routes aria-label="重新计算交通">↻</button>`;
-    return;
-  }
-  box.innerHTML = '<span class="route-icon">!</span><span><strong>暂时无法取得交通时间</strong><small>地图仍会按行程顺序连接地区</small></span><button data-refresh-routes>重试</button>';
+  const count = state.savedRoutes.length;
+  box.innerHTML = `<span class="route-icon">⇄</span><span><strong>${count ? `已保存 ${count} 条交通路线` : "规划两地交通"}</strong><small>${count ? "查看班次、费用或更换方案" : "公共交通、步行、骑行与驾车方案"}</small></span><button data-open-route-planner aria-label="打开路线规划">›</button>`;
 }
 function renderAreaCard(area) {
   const selected = area.id === state.selectedAreaId; const expanded = state.expandedAreas.has(area.id);
   const dateLabel = area.startDate ? `${area.startDate}${area.endDate ? ` — ${area.endDate}` : ""}` : "日期未定";
-  const leg = routeLegTo(area.id);
-  const routeMeta = leg && Number.isFinite(leg.distanceMeters) ? `<span class="area-route-meta">从上一站 🚗 ${esc(compactDuration(leg.durationMillis))} · ${esc(compactDistance(leg.distanceMeters))}</span>` : "";
   return `<article class="area-card${selected ? " selected" : ""}" data-area-card="${esc(area.id)}" draggable="true">
-    ${routeMeta}<div class="area-summary"><button class="drag-handle" aria-label="拖动调整顺序">⋮⋮</button><button class="area-main" data-select-area="${esc(area.id)}"><span class="area-title-row"><span class="area-pin">⭐</span><h3>${esc(area.name)}</h3></span><p>${esc(area.address)}</p><span class="area-inline-meta">${esc(dateLabel)}${area.nights ? ` · ${esc(area.nights)} 晚` : ""} · ${area.candidateIds.length} 个地点</span></button><button class="candidate-toggle" data-toggle-area-candidates="${esc(area.id)}" aria-expanded="${expanded}" aria-label="${expanded ? "收起" : "展开"} ${esc(area.name)} 的候选地点"><span class="chevron">⌄</span></button></div>
+    <div class="area-summary"><button class="drag-handle" aria-label="拖动调整顺序">⋮⋮</button><button class="area-main" data-select-area="${esc(area.id)}"><span class="area-title-row"><span class="area-pin">⭐</span><h3>${esc(area.name)}</h3></span><p>${esc(area.address)}</p><span class="area-inline-meta">${esc(dateLabel)}${area.nights ? ` · ${esc(area.nights)} 晚` : ""} · ${area.candidateIds.length} 个地点</span></button><button class="candidate-toggle" data-toggle-area-candidates="${esc(area.id)}" aria-expanded="${expanded}" aria-label="${expanded ? "收起" : "展开"} ${esc(area.name)} 的候选地点"><span class="chevron">⌄</span></button></div>
     ${expanded ? `<div class="area-expanded"><div class="area-expanded-heading"><span>候选地点</span><button class="icon-menu-button" data-toggle-area-editor="${esc(area.id)}">编辑地区</button></div><div class="area-candidates">${areaCandidateRows(area)}</div><div class="area-primary-actions"><button class="add-candidates-button" data-open-picker="${esc(area.id)}">＋ 添加候选地点</button><button class="explore-nearby-button" data-explore-nearby="${esc(area.id)}">⌖ 探索周边</button></div></div>` : ""}
     ${selected && area.editing ? `<div class="area-editor"><label>地区名称<input data-area-field="name" data-area-id="${esc(area.id)}" value="${esc(area.name)}"></label><label>停留晚数<input type="number" min="0" data-area-field="nights" data-area-id="${esc(area.id)}" value="${esc(area.nights)}"></label><label>开始日期<input type="date" data-area-field="startDate" data-area-id="${esc(area.id)}" value="${esc(area.startDate)}"></label><label>结束日期<input type="date" data-area-field="endDate" data-area-id="${esc(area.id)}" value="${esc(area.endDate)}"></label><label class="wide">备注<textarea data-area-field="note" data-area-id="${esc(area.id)}">${esc(area.note)}</textarea></label><button class="delete-area" data-delete-area="${esc(area.id)}">移除这个地区</button></div>` : ""}
   </article>`;
@@ -373,14 +412,18 @@ function renderCandidates() {
   items.forEach(item => { const group = candidateRegion(item); if (!groups.has(group)) groups.set(group, []); groups.get(group).push(item); });
   $("candidateList").innerHTML = [...groups.entries()].map(([group,rows]) => `<section class="candidate-group"><div class="candidate-group-heading"><h3>${esc(group)}</h3><span>${rows.length}</span></div>${rows.map(candidateCard).join("")}</section>`).join("");
 }
-function renderAll({ fitMap = false } = {}) { renderCounts(); renderTripRouteSummary(); renderAreas(); renderCandidates(); renderMap({ fit: fitMap }); updateLayerButtons(); }
+function renderAll({ fitMap = false } = {}) {
+  renderCounts(); renderTripRouteSummary(); renderAreas(); renderCandidates();
+  if (state.view === "routes") renderRoutePlanner(); else renderSavedRoutes();
+  renderMap({ fit: fitMap }); updateLayerButtons();
+}
 
 function selectArea(id) {
   if (!areaById(id)) return; state.selectedAreaId = id; state.selectedCandidateId = null; state.showAreas = true; state.showCandidates = true;
   saveUserState(); renderAll({ fitMap: true });
 }
 function clearAreaFocus() { state.selectedAreaId = null; state.selectedCandidateId = null; state.showCandidates = state.view === "candidates"; saveUserState(); renderAll({ fitMap: true }); }
-function deleteArea(id) { state.areas = state.areas.filter(area => area.id !== id); if (state.selectedAreaId === id) state.selectedAreaId = null; state.expandedAreas.delete(id); saveUserState(); renderAll({ fitMap: true }); queueRouteRefresh(true); }
+function deleteArea(id) { state.areas = state.areas.filter(area => area.id !== id); if (state.selectedAreaId === id) state.selectedAreaId = null; state.expandedAreas.delete(id); saveUserState(); renderAll({ fitMap: true }); }
 function removeCandidateFromArea(areaId, candidateId) { const area = areaById(areaId); if (!area) return; area.candidateIds = area.candidateIds.filter(id => id !== candidateId); saveUserState(); renderAll({ fitMap: true }); }
 function updateLayerButtons() { $("toggleAreaLayer").classList.toggle("active", state.showAreas); $("toggleCandidateLayer").classList.toggle("active", state.showCandidates); $("toggleMapLegend").classList.toggle("active", state.legendOpen); }
 
@@ -389,51 +432,368 @@ function pointLiteral(point) {
   const lng = typeof point?.lng === "function" ? point.lng() : point?.lng;
   return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
 }
-function areaRouteWaypoint(area, Place) {
-  if (area.placeId && !String(area.placeId).startsWith("catalog-")) {
-    try { return new Place({ id: area.placeId, requestedLanguage: "zh-CN", requestedRegion: "JP" }); } catch (_) { /* use coordinates */ }
-  }
-  return { lat: area.lat, lng: area.lon };
+function routeWaypoint(endpoint) { return { lat: endpoint.lat, lng: endpoint.lon }; }
+function endpointFromArea(area) {
+  return { source: "area", sourceId: area.id, placeId: area.placeId, name: area.name, address: area.address, lat: area.lat, lon: area.lon };
 }
-async function refreshTripRoutes({ force = false } = {}) {
-  const signature = state.areas.map(area => `${area.id}:${area.lat}:${area.lon}`).join("|");
-  if (state.areas.length < 2 || mapProvider !== "google") {
-    state.routeLegs = []; state.routeStatus = state.areas.length < 2 ? "idle" : "unavailable"; state.routeSignature = signature; renderTripRouteSummary(); return;
-  }
-  if (!force && signature === state.routeSignature && state.routeLegs.length === state.areas.length - 1) return;
-  const requestId = ++state.routeRequestId;
-  state.routeSignature = signature; state.routeStatus = "loading"; state.routeLegs = []; renderTripRouteSummary(); renderAreas();
+function endpointFromCandidate(item) {
+  return { source: "candidate", sourceId: item.id, placeId: item.location?.provider_place_id || `local-${item.id}`, name: item.name,
+    address: [item.municipality,item.region].filter(Boolean).join(" · "), lat: item.location.lat, lon: item.location.lon };
+}
+function localRouteEndpointMatches(query) {
+  const value = query.trim().toLowerCase(); if (!value) return [];
+  const areaRows = state.areas.filter(area => [area.name,area.address].join(" ").toLowerCase().includes(value)).map(endpointFromArea);
+  const candidates = state.candidates.filter(item => validCoordinates(item) && searchCandidateText(item).includes(value)).slice(0, 6).map(endpointFromCandidate);
+  return [...areaRows,...candidates].slice(0, 8);
+}
+function routeEndpointInput(target) { return $(target === "origin" ? "routeOriginSearch" : "routeDestinationSearch"); }
+function routeEndpointResults(target) { return $(target === "origin" ? "routeOriginResults" : "routeDestinationResults"); }
+function renderRouteEndpointResults(target, localRows, predictions = [], apiUnavailable = false) {
+  const box = routeEndpointResults(target);
+  state.routeSearchPredictions = predictions;
+  const localHtml = localRows.map((row,index) => `<button type="button" data-route-local-endpoint="${index}"><span class="route-result-icon">${row.source === "area" ? "⭐" : "●"}</span><span><strong>${esc(row.name)}</strong><small>${esc(row.address || (row.source === "area" ? "行程地区" : "Candidate"))}</small></span><em>${row.source === "area" ? "地区" : "Candidate"}</em></button>`).join("");
+  const liveHtml = predictions.map((prediction,index) => `<button type="button" data-route-live-endpoint="${index}"><span class="route-result-icon">⌖</span><span><strong>${esc(prediction.mainText?.toString() || prediction.text.toString())}</strong><small>${esc(prediction.secondaryText?.toString() || "Google Maps")}</small></span><em>Google</em></button>`).join("");
+  box.dataset.localRows = JSON.stringify(localRows);
+  box.innerHTML = localHtml + liveHtml || `<div class="route-place-empty">${apiUnavailable ? "实时搜索暂不可用，也没有匹配的已收藏地点" : "没有匹配地点"}</div>`;
+  box.hidden = false;
+}
+async function searchRouteEndpoint(target) {
+  const input = routeEndpointInput(target); const query = input.value.trim(); const box = routeEndpointResults(target);
+  if (!query) { box.hidden = true; return; }
+  const localRows = localRouteEndpointMatches(query);
+  if (!state.placesReady || mapProvider !== "google") return renderRouteEndpointResults(target, localRows, [], true);
+  const requestId = ++state.routeSearchRequestId;
+  renderRouteEndpointResults(target, localRows, []);
   try {
-    const [{ Route }, { Place }] = await Promise.all([google.maps.importLibrary("routes"),google.maps.importLibrary("places")]);
-    const legs = [];
-    for (let index = 1; index < state.areas.length; index += 1) {
-      if (requestId !== state.routeRequestId) return;
-      const from = state.areas[index - 1]; const to = state.areas[index];
-      try {
-        const { routes } = await Route.computeRoutes({
-          origin: areaRouteWaypoint(from, Place), destination: areaRouteWaypoint(to, Place), travelMode: "DRIVING",
-          routingPreference: "TRAFFIC_UNAWARE", language: "zh-CN", region: "JP",
-          fields: ["distanceMeters","durationMillis","path"],
-        });
-        const route = routes?.[0];
-        if (!route) throw new Error("No route returned");
-        legs.push({ fromId: from.id, toId: to.id, distanceMeters: route.distanceMeters, durationMillis: route.durationMillis,
-          path: (route.path || []).map(pointLiteral).filter(Boolean) });
-      } catch (error) {
-        console.warn(`Route unavailable for ${from.name} → ${to.name}:`, error?.message || error);
-        legs.push({ fromId: from.id, toId: to.id, error: error?.message || "route unavailable" });
-      }
+    const { AutocompleteSessionToken, AutocompleteSuggestion } = await google.maps.importLibrary("places");
+    if (!state.routeSearchSessionToken || state.routeSearchTarget !== target) state.routeSearchSessionToken = new AutocompleteSessionToken();
+    state.routeSearchTarget = target;
+    const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({ input: query, sessionToken: state.routeSearchSessionToken, language: "zh-CN", region: "jp" });
+    if (requestId !== state.routeSearchRequestId || input.value.trim() !== query) return;
+    renderRouteEndpointResults(target, localRows, suggestions.map(item => item.placePrediction).filter(Boolean).slice(0, 7));
+  } catch (error) {
+    console.warn("Route endpoint autocomplete unavailable:", error?.message || error);
+    if (requestId === state.routeSearchRequestId) renderRouteEndpointResults(target, localRows, [], true);
+  }
+}
+function scheduleRouteEndpointSearch(target) {
+  clearTimeout(routeSearchTimer); state.routeSearchRequestId += 1;
+  state.routeDraft[target] = null; state.routeOptions = []; state.routeStatus = "idle";
+  renderRoutePlanner(); renderMap();
+  routeSearchTimer = setTimeout(() => void searchRouteEndpoint(target), 260);
+}
+function chooseLocalRouteEndpoint(target, index) {
+  const box = routeEndpointResults(target); const rows = JSON.parse(box.dataset.localRows || "[]"); const endpoint = rows[index]; if (!endpoint) return;
+  setRouteEndpoint(target, endpoint);
+}
+async function chooseLiveRouteEndpoint(target, index) {
+  const prediction = state.routeSearchPredictions[index]; if (!prediction) return;
+  const box = routeEndpointResults(target); box.innerHTML = '<div class="route-place-empty">正在确认地点…</div>';
+  try {
+    const place = prediction.toPlace();
+    await place.fetchFields({ fields: ["id","displayName","formattedAddress","location"] });
+    if (!place.location) throw new Error("missing location");
+    setRouteEndpoint(target, { source: "google", sourceId: place.id, placeId: place.id,
+      name: place.displayName || prediction.mainText?.toString() || prediction.text.toString(),
+      address: place.formattedAddress || prediction.secondaryText?.toString() || "",
+      lat: place.location.lat(), lon: place.location.lng() });
+    state.routeSearchSessionToken = null;
+  } catch (_) { box.innerHTML = '<div class="route-place-empty">无法读取这个地点，请重新搜索</div>'; }
+}
+function setRouteEndpoint(target, endpoint) {
+  state.routeDraft[target] = endpoint; routeEndpointInput(target).value = endpoint.name; routeEndpointResults(target).hidden = true;
+  state.routeOptions = []; state.routeStatus = "idle"; renderRoutePlanner(); renderMap({ fit: true });
+}
+function clearRouteEndpoint(target) {
+  state.routeDraft[target] = null; routeEndpointInput(target).value = ""; routeEndpointResults(target).hidden = true;
+  state.routeOptions = []; state.routeStatus = "idle"; renderRoutePlanner(); renderMap();
+}
+function swapRouteEndpoints() {
+  const origin = state.routeDraft.origin; state.routeDraft.origin = state.routeDraft.destination; state.routeDraft.destination = origin;
+  routeEndpointInput("origin").value = state.routeDraft.origin?.name || ""; routeEndpointInput("destination").value = state.routeDraft.destination?.name || "";
+  state.routeOptions = []; state.routeStatus = "idle"; renderRoutePlanner(); renderMap({ fit: true });
+}
+function valueText(value) {
+  if (value == null) return ""; if (typeof value === "string" || typeof value === "number") return String(value);
+  return value.text || value.localizedText || (typeof value.toString === "function" && value.toString() !== "[object Object]" ? value.toString() : "");
+}
+function dateISO(value) {
+  if (!value) return ""; const date = value instanceof Date ? value : new Date(value); return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+}
+function timeLabel(value) {
+  if (!value) return ""; const date = new Date(value); if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Tokyo" }).format(date);
+}
+function moneyText(money) {
+  if (!money) return ""; const localized = valueText(money); if (localized) return localized;
+  const units = Number(money.units || 0) + Number(money.nanos || 0) / 1e9;
+  if (!money.currencyCode && !units) return "";
+  try { return new Intl.NumberFormat("zh-CN", { style: "currency", currency: money.currencyCode || "JPY", maximumFractionDigits: 0 }).format(units); } catch (_) { return `${money.currencyCode || ""} ${units}`.trim(); }
+}
+function transitSegmentFromStep(step) {
+  const detail = step.transitDetails; if (!detail) return null; const line = detail.transitLine || {}; const vehicle = line.vehicle || {};
+  return {
+    mode: vehicle.vehicleType || "TRANSIT", vehicle: vehicle.name || TRANSIT_MODE_LABELS[vehicle.vehicleType] || "公共交通",
+    line: line.shortName || line.name || detail.tripShortText || "公共交通", lineName: line.name || "", color: line.color || "#1a73e8",
+    departureStop: detail.departureStop?.name || "", arrivalStop: detail.arrivalStop?.name || "", headsign: detail.headsign || "",
+    departureTime: dateISO(detail.departureTime), arrivalTime: dateISO(detail.arrivalTime), stopCount: detail.stopCount || 0,
+    headwayMillis: detail.headwayMillis || 0, agencies: (line.agencies || []).map(agency => agency.name).filter(Boolean),
+    durationMillis: step.staticDurationMillis || 0,
+  };
+}
+function serializeRouteOption(route, index) {
+  const steps = (route.legs || []).flatMap(leg => leg.steps || []); const segments = steps.map(transitSegmentFromStep).filter(Boolean);
+  const walkingMillis = steps.filter(step => String(step.travelMode) === "WALKING").reduce((sum,step) => sum + (step.staticDurationMillis || 0), 0);
+  const fare = valueText(route.localizedValues?.transitFare) || moneyText(route.travelAdvisory?.transitFare);
+  const tolls = (route.travelAdvisory?.tollInfo?.estimatedPrices || []).map(moneyText).filter(Boolean).join(" / ");
+  return {
+    index, description: route.description || "", distanceMeters: route.distanceMeters || 0, durationMillis: route.durationMillis || 0,
+    durationText: valueText(route.localizedValues?.duration), distanceText: valueText(route.localizedValues?.distance),
+    fare: fare || tolls || "", path: (route.path || []).map(pointLiteral).filter(Boolean), segments, walkingMillis,
+    transfers: Math.max(0, segments.length - 1), departureTime: segments[0]?.departureTime || "", arrivalTime: segments.at(-1)?.arrivalTime || "",
+    warnings: (route.warnings || []).map(valueText).filter(Boolean),
+  };
+}
+function durationMillis(value) {
+  if (Number.isFinite(value)) return value; const seconds = Number.parseFloat(String(value || "").replace(/s$/, "")); return Number.isFinite(seconds) ? seconds * 1000 : 0;
+}
+function restTransitSegment(step) {
+  const detail = step.transitDetails; if (!detail) return null; const stops = detail.stopDetails || {}; const line = detail.transitLine || {}; const vehicle = line.vehicle || {};
+  return { mode: vehicle.type || "TRANSIT", vehicle: valueText(vehicle.name) || TRANSIT_MODE_LABELS[vehicle.type] || "公共交通",
+    line: line.nameShort || line.name || detail.tripShortText || "公共交通", lineName: line.name || "", color: line.color || "#1a73e8",
+    departureStop: stops.departureStop?.name || "", arrivalStop: stops.arrivalStop?.name || "", headsign: detail.headsign || "",
+    departureTime: stops.departureTime || "", arrivalTime: stops.arrivalTime || "", stopCount: detail.stopCount || 0,
+    headwayMillis: durationMillis(detail.headway), agencies: (line.agencies || []).map(agency => agency.name).filter(Boolean), durationMillis: durationMillis(step.staticDuration) };
+}
+function serializeRestRouteOption(route, index) {
+  const steps = (route.legs || []).flatMap(leg => leg.steps || []); const segments = steps.map(restTransitSegment).filter(Boolean);
+  const coordinates = route.polyline?.geoJsonLinestring?.coordinates || [];
+  const walkingMillis = steps.filter(step => ["WALK","WALKING"].includes(step.travelMode)).reduce((sum,step) => sum + durationMillis(step.staticDuration), 0);
+  return { index, description: route.description || "", distanceMeters: route.distanceMeters || 0, durationMillis: durationMillis(route.duration),
+    durationText: valueText(route.localizedValues?.duration), distanceText: valueText(route.localizedValues?.distance),
+    fare: valueText(route.localizedValues?.transitFare) || moneyText(route.travelAdvisory?.transitFare),
+    path: coordinates.map(point => ({ lat: Number(point[1]), lng: Number(point[0]) })).filter(point => Number.isFinite(point.lat) && Number.isFinite(point.lng)),
+    segments, walkingMillis, transfers: Math.max(0,segments.length - 1), departureTime: segments[0]?.departureTime || "", arrivalTime: segments.at(-1)?.arrivalTime || "",
+    warnings: (route.warnings || []).filter(Boolean) };
+}
+async function computeTransitRoutesREST(origin,destination,time) {
+  const apiKey = window.GOOGLE_MAPS_CONFIG?.apiKey; if (!apiKey) return [];
+  const body = { origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lon } } },
+    destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lon } } }, travelMode: "TRANSIT",
+    computeAlternativeRoutes: true, languageCode: "zh-CN", regionCode: "JP", units: "METRIC", polylineQuality: "OVERVIEW", polylineEncoding: "GEO_JSON_LINESTRING" };
+  if (time) body[state.routeDraft.timeMode === "arrival" ? "arrivalTime" : "departureTime"] = time.toISOString();
+  const transitPreferences = {}; if (state.routeDraft.transitModes.length) transitPreferences.allowedTravelModes = state.routeDraft.transitModes;
+  if (state.routeDraft.transitPreference) transitPreferences.routingPreference = state.routeDraft.transitPreference;
+  if (Object.keys(transitPreferences).length) body.transitPreferences = transitPreferences;
+  const response = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", { method: "POST", headers: {
+    "Content-Type": "application/json", "X-Goog-Api-Key": apiKey,
+    "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.polyline.geoJsonLinestring,routes.legs.steps.travelMode,routes.legs.steps.staticDuration,routes.legs.steps.transitDetails,routes.localizedValues,routes.travelAdvisory.transitFare,routes.warnings",
+  }, body: JSON.stringify(body) });
+  const payload = await response.json(); if (!response.ok) throw new Error(payload.error?.message || `Routes HTTP ${response.status}`);
+  return (payload.routes || []).map(serializeRestRouteOption);
+}
+function legacyTransitSegment(step) {
+  const detail = step.transit; if (!detail) return null; const line = detail.line || {}; const vehicle = line.vehicle || {};
+  return { mode: vehicle.type || "TRANSIT", vehicle: vehicle.name || TRANSIT_MODE_LABELS[vehicle.type] || "公共交通",
+    line: line.short_name || line.name || "公共交通", lineName: line.name || "", color: line.color || "#1a73e8",
+    departureStop: detail.departure_stop?.name || "", arrivalStop: detail.arrival_stop?.name || "", headsign: detail.headsign || "",
+    departureTime: dateISO(detail.departure_time?.value || detail.departure_time?.time), arrivalTime: dateISO(detail.arrival_time?.value || detail.arrival_time?.time),
+    stopCount: detail.num_stops || 0, headwayMillis: (detail.headway || 0) * 1000,
+    agencies: (line.agencies || []).map(agency => agency.name).filter(Boolean), durationMillis: (step.duration?.value || 0) * 1000 };
+}
+function serializeLegacyRouteOption(route,index) {
+  const legs = route.legs || []; const steps = legs.flatMap(leg => leg.steps || []); const segments = steps.map(legacyTransitSegment).filter(Boolean);
+  const durationSeconds = legs.reduce((sum,leg) => sum + (leg.duration?.value || 0), 0); const distanceMeters = legs.reduce((sum,leg) => sum + (leg.distance?.value || 0), 0);
+  const walkingMillis = steps.filter(step => String(step.travel_mode) === "WALKING").reduce((sum,step) => sum + (step.duration?.value || 0) * 1000, 0);
+  return { index, description: route.summary || "", distanceMeters, durationMillis: durationSeconds * 1000,
+    durationText: legs.map(leg => leg.duration?.text).filter(Boolean).join(" + "), distanceText: legs.map(leg => leg.distance?.text).filter(Boolean).join(" + "),
+    fare: route.fare?.text || "", path: (route.overview_path || []).map(pointLiteral).filter(Boolean), segments, walkingMillis,
+    transfers: Math.max(0,segments.length - 1), departureTime: segments[0]?.departureTime || "", arrivalTime: segments.at(-1)?.arrivalTime || "",
+    warnings: (route.warnings || []).filter(Boolean) };
+}
+async function computeTransitDirectionsLegacy(origin,destination,time) {
+  const { DirectionsService } = await google.maps.importLibrary("routes"); if (!DirectionsService) return [];
+  const transitOptions = {}; if (time) transitOptions[state.routeDraft.timeMode === "arrival" ? "arrivalTime" : "departureTime"] = time;
+  if (state.routeDraft.transitModes.length) transitOptions.modes = state.routeDraft.transitModes;
+  if (state.routeDraft.transitPreference) transitOptions.routingPreference = state.routeDraft.transitPreference;
+  const result = await new DirectionsService().route({ origin: routeWaypoint(origin), destination: routeWaypoint(destination), travelMode: "TRANSIT",
+    provideRouteAlternatives: true, transitOptions, unitSystem: google.maps.UnitSystem.METRIC, region: "JP" });
+  return (result.routes || []).map(serializeLegacyRouteOption);
+}
+function japanDateFromInput(value) {
+  if (!value) return null; const date = new Date(`${value.length === 16 ? value + ":00" : value}+09:00`); return Number.isNaN(date.getTime()) ? null : date;
+}
+function japanInputFromDate(date) { return new Date(date.getTime() + 9 * 3600000).toISOString().slice(0,16); }
+function routeRequestDate() { return japanDateFromInput(state.routeDraft.dateTime); }
+async function searchRoutes() {
+  const { origin,destination,travelMode } = state.routeDraft;
+  if (!origin || !destination) { state.routeStatus = "error"; renderRoutePlanner("请先选择明确的起点和终点"); return; }
+  if (mapProvider !== "google") { state.routeStatus = "error"; renderRoutePlanner("Google 路线服务暂不可用，请稍后重试"); return; }
+  const requestId = ++state.routeRequestId; state.routeStatus = "loading"; state.routeOptions = []; renderRoutePlanner();
+  try {
+    const { Route } = await google.maps.importLibrary("routes");
+    const request = { origin: routeWaypoint(origin), destination: routeWaypoint(destination), travelMode,
+      computeAlternativeRoutes: true, language: "zh-CN", region: "JP", fields: ["path","legs","distanceMeters","durationMillis","localizedValues","travelAdvisory","description","warnings"] };
+    const time = routeRequestDate();
+    if (travelMode === "TRANSIT") {
+      if (time) request[state.routeDraft.timeMode === "arrival" ? "arrivalTime" : "departureTime"] = time;
+      const transitPreference = {};
+      if (state.routeDraft.transitModes.length) transitPreference.allowedTransitModes = state.routeDraft.transitModes;
+      if (state.routeDraft.transitPreference) transitPreference.routingPreference = state.routeDraft.transitPreference;
+      if (Object.keys(transitPreference).length) request.transitPreference = transitPreference;
+    } else if (travelMode === "DRIVING") {
+      request.routingPreference = "TRAFFIC_AWARE"; if (time) request.departureTime = time;
+    }
+    let { routes } = await Route.computeRoutes(request);
+    if (travelMode === "TRANSIT" && !routes?.length && request.computeAlternativeRoutes) {
+      request.computeAlternativeRoutes = false;
+      ({ routes } = await Route.computeRoutes(request));
     }
     if (requestId !== state.routeRequestId) return;
-    state.routeLegs = legs; state.routeStatus = legs.some(leg => leg.error) ? (legs.some(leg => !leg.error) ? "partial" : "unavailable") : "ready";
+    state.routeOptions = (routes || []).map(serializeRouteOption);
+    if (travelMode === "TRANSIT" && !state.routeOptions.length) {
+      try { state.routeOptions = await computeTransitRoutesREST(origin,destination,time); }
+      catch (restError) { console.warn("Transit REST fallback unavailable:", restError?.message || restError); }
+      if (!state.routeOptions.length) {
+        try { state.routeOptions = await computeTransitDirectionsLegacy(origin,destination,time); }
+        catch (legacyError) { console.warn("Transit Directions fallback unavailable:", legacyError?.message || legacyError); }
+      }
+    }
+    state.selectedRouteOption = 0;
+    state.routeStatus = state.routeOptions.length ? "ready" : "empty"; state.routeDetailsOpen = new Set();
   } catch (error) {
-    console.warn("Google Routes library unavailable:", error?.message || error);
+    console.warn("Route search unavailable:", error?.message || error);
     if (requestId !== state.routeRequestId) return;
-    state.routeLegs = []; state.routeStatus = "unavailable";
+    state.routeOptions = []; state.routeStatus = "error";
   }
-  renderAll();
+  renderRoutePlanner(); renderMap({ fit: true });
 }
-function queueRouteRefresh(force = false) { window.setTimeout(() => void refreshTripRoutes({ force }), 0); }
+function selectRouteOption(index, { fit = false } = {}) { if (!state.routeOptions[index]) return; state.selectedRouteOption = index; renderRoutePlanner(); renderMap({ fit }); }
+function routeSequence(option) { return option.segments.length ? option.segments.map(segment => segment.line).join(" → ") : ROUTE_MODES[option.travelMode || state.routeDraft.travelMode]?.label || "路线"; }
+function renderTransitTimeline(option) {
+  if (!option.segments.length) return `<div class="route-no-segments">${state.routeDraft.travelMode === "TRANSIT" ? "Google 未提供分段班次资料" : "选择路线后会在地图上高亮完整路径"}</div>`;
+  return `<div class="transit-timeline">${option.segments.map(segment => `<div class="transit-segment"><span class="segment-line" style="background:${esc(segment.color)}">${esc(segment.line)}</span><div><strong>${esc(timeLabel(segment.departureTime))} ${esc(segment.departureStop)}</strong><p>${esc(segment.vehicle)}${segment.headsign ? ` · 开往 ${esc(segment.headsign)}` : ""}${segment.stopCount ? ` · ${esc(segment.stopCount)} 站` : ""}</p><small>${esc(timeLabel(segment.arrivalTime))} 到达 ${esc(segment.arrivalStop)}${segment.headwayMillis ? ` · 约每 ${esc(compactDuration(segment.headwayMillis))} 一班` : ""}${segment.agencies.length ? ` · ${esc(segment.agencies.join(" / "))}` : ""}</small></div></div>`).join("")}</div>`;
+}
+function renderRouteOption(option,index) {
+  const selected = index === state.selectedRouteOption; const expanded = state.routeDetailsOpen.has(index);
+  const optionMode = option.travelMode || state.routeDraft.travelMode; const mode = ROUTE_MODES[optionMode] || ROUTE_MODES.TRANSIT;
+  const optionLabel = option.custom ? `${routeSequence(option)} · 自定义` : `${mode.label}方案 ${index + 1}`;
+  return `<article class="route-option${selected ? " selected" : ""}${option.custom ? " custom" : ""}" data-route-option-card="${index}"><button class="route-option-main" type="button" data-select-route-option="${index}"><span class="route-radio">${selected ? "●" : "○"}</span><span class="route-option-copy"><span class="route-option-times"><strong>${esc(option.durationText || compactDuration(option.durationMillis))}</strong>${option.departureTime && option.arrivalTime ? `<b>${esc(timeLabel(option.departureTime).split(" ").at(-1))}—${esc(timeLabel(option.arrivalTime).split(" ").at(-1))}</b>` : ""}</span><span class="route-sequence">${esc(optionLabel)}</span><span class="route-metrics"><em>${mode.icon} ${esc(mode.label)}</em><em>${option.distanceText || compactDistance(option.distanceMeters)}</em>${optionMode === "TRANSIT" ? `<em>${option.transfers} 次换乘</em><em>${option.walkingMillis ? `步行 ${esc(compactDuration(option.walkingMillis))}` : "少量步行"}</em>` : ""}</span></span><span class="route-fare ${option.fare ? "" : "missing"}">${esc(option.fare || (optionMode === "WALKING" || optionMode === "BICYCLING" ? "免费" : "费用未提供"))}</span></button><button class="route-detail-toggle" type="button" data-toggle-route-details="${index}" aria-expanded="${expanded}">${expanded ? "收起班次并返回地图" : "班次详情"}</button>${expanded ? `<div class="route-option-details">${renderTransitTimeline(option)}${option.custom && option.customStops ? `<p class="custom-stops"><strong>经停：</strong>${esc(option.customStops)}</p>` : ""}${option.custom && option.frequency ? `<p class="custom-stops"><strong>班次：</strong>${esc(option.frequency)}</p>` : ""}${option.warnings.length ? `<p class="route-warning">${esc(option.warnings.join("；"))}</p>` : ""}</div>` : ""}</article>`;
+}
+function straightLineDistance(a,b) {
+  const radians = value => value * Math.PI / 180; const earth = 6371000;
+  const dLat = radians(b.lat - a.lat); const dLon = radians(b.lon - a.lon); const lat1 = radians(a.lat); const lat2 = radians(b.lat);
+  const value = Math.sin(dLat/2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon/2) ** 2;
+  return earth * 2 * Math.atan2(Math.sqrt(value),Math.sqrt(1-value));
+}
+function addCustomRouteOption() {
+  const { origin,destination } = state.routeDraft; const name = $("customRouteName").value.trim();
+  if (!origin || !destination) return renderRoutePlanner("请先选择自定义路线的起点和终点");
+  if (!name) return renderRoutePlanner("请填写运营方或线路名称");
+  const departure = japanDateFromInput($("customDepartureTime").value); const arrival = japanDateFromInput($("customArrivalTime").value);
+  if (!departure || !arrival || arrival <= departure) return renderRoutePlanner("自定义路线的到达时间必须晚于出发时间");
+  const customType = $("customRouteType").value; const vehicleLabels = { TOUR_BUS: "观光巴士", BUS: "巴士", TRAIN: "列车", FERRY: "渡轮", SHUTTLE: "接驳车", CHARTER: "包车", OTHER: "其他交通" };
+  const durationMillis = arrival.getTime() - departure.getTime();
+  const option = { index: state.routeOptions.length, custom: true, travelMode: "CUSTOM", customType, description: name,
+    distanceMeters: straightLineDistance(origin,destination), distanceText: "地图示意线", durationMillis, durationText: compactDuration(durationMillis),
+    fare: $("customRouteCost").value.trim(), path: [{ lat: origin.lat, lng: origin.lon },{ lat: destination.lat, lng: destination.lon }], walkingMillis: 0,
+    transfers: 0, departureTime: departure.toISOString(), arrivalTime: arrival.toISOString(), frequency: $("customFrequency").value.trim(),
+    customStops: $("customStops").value.trim(), warnings: [$("customRouteNotes").value.trim()].filter(Boolean),
+    segments: [{ mode: customType, vehicle: vehicleLabels[customType], line: name, lineName: name, color: "#7b61a8",
+      departureStop: origin.name, arrivalStop: destination.name, headsign: destination.name, departureTime: departure.toISOString(), arrivalTime: arrival.toISOString(),
+      stopCount: 0, headwayMillis: 0, agencies: [], durationMillis }],
+  };
+  state.routeOptions.push(option); state.selectedRouteOption = option.index; state.routeStatus = "ready";
+  $("customRoutePanel").hidden = true; renderRoutePlanner();
+  $("routeTitle").value = name; $("routeManualCost").value = option.fare; $("routeNotes").value = option.warnings[0] || "";
+  renderMap({ fit: true }); showToast("自定义路线已加入对比，请确认后保存");
+}
+function openCustomRouteEditor() {
+  const option = currentRouteOption();
+  if (option?.custom) {
+    $("customRouteName").value = option.description || option.segments?.[0]?.line || "";
+    $("customRouteType").value = option.customType || "TOUR_BUS";
+    $("customRouteCost").value = option.fare || "";
+    $("customDepartureTime").value = option.departureTime ? japanInputFromDate(new Date(option.departureTime)) : state.routeDraft.dateTime;
+    $("customArrivalTime").value = option.arrivalTime ? japanInputFromDate(new Date(option.arrivalTime)) : state.routeDraft.dateTime;
+    $("customFrequency").value = option.frequency || "";
+    $("customStops").value = option.customStops || "";
+    $("customRouteNotes").value = option.warnings?.[0] || "";
+  } else if (!$("customDepartureTime").value) {
+    $("customDepartureTime").value = state.routeDraft.dateTime;
+  }
+  $("customRoutePanel").hidden = false; $("customRouteName").focus();
+}
+function renderSavedRoutes() {
+  $("savedRouteCount").textContent = state.savedRoutes.length; $("savedRoutesHint").textContent = `${state.savedRoutes.length} 条`;
+  $("savedRoutesList").innerHTML = state.savedRoutes.length ? state.savedRoutes.map(route => {
+    const active = route.id === state.activeSavedRouteId; const option = route.selectedOption; const mode = ROUTE_MODES[option.travelMode || route.travelMode] || ROUTE_MODES.TRANSIT;
+    return `<article class="saved-route-card${active ? " active" : ""}"><button type="button" data-open-saved-route="${esc(route.id)}"><span class="saved-route-icon">${mode.icon}</span><span><strong>${esc(route.title)}</strong><small>${esc(route.origin.name)} → ${esc(route.destination.name)}</small><em>${esc(option.durationText || compactDuration(option.durationMillis))}${option.departureTime ? ` · ${esc(timeLabel(option.departureTime))}` : ""} · ${esc(route.manualCost || option.fare || "费用未提供")}</em></span></button><button type="button" class="delete-saved-route" data-delete-saved-route="${esc(route.id)}" aria-label="删除 ${esc(route.title)}">×</button></article>`;
+  }).join("") : '<div class="saved-route-empty">还没有保存路线。搜索并选择方案后，它会留在地图上。</div>';
+}
+function renderRoutePlanner(message = "") {
+  document.body.classList.toggle("route-details-visible", state.view === "routes" && state.routeDetailsOpen.size > 0);
+  document.querySelectorAll("[data-route-mode]").forEach(button => button.classList.toggle("active", button.dataset.routeMode === state.routeDraft.travelMode));
+  document.querySelectorAll("[data-transit-mode]").forEach(button => button.classList.toggle("active", button.dataset.transitMode === (state.routeDraft.transitModes[0] || "")));
+  $("transitFilters").hidden = state.routeDraft.travelMode !== "TRANSIT";
+  $("routeTimeMode").querySelector('option[value="arrival"]').disabled = state.routeDraft.travelMode !== "TRANSIT";
+  $("routeTimeMode").disabled = state.routeDraft.travelMode === "WALKING" || state.routeDraft.travelMode === "BICYCLING";
+  $("routeDateTime").disabled = state.routeDraft.travelMode === "WALKING" || state.routeDraft.travelMode === "BICYCLING";
+  if (state.routeStatus === "loading") $("routeSearchStatus").innerHTML = '<span class="route-spinner"></span><strong>正在比较可用路线与班次…</strong>';
+  else if (message) $("routeSearchStatus").innerHTML = `<strong>${esc(message)}</strong>`;
+  else if (state.routeStatus === "error") $("routeSearchStatus").innerHTML = '<strong>暂时无法取得路线，请检查地点或时间后重试</strong>';
+  else if (state.routeStatus === "empty" && state.routeDraft.travelMode === "TRANSIT") $("routeSearchStatus").innerHTML = '<strong>Google 路线接口没有返回这段公共交通</strong><small>可试前后 30 分钟；若 Google Maps 网站有路线但接口没有，请用“自定义路线”记录 JR、巴士、观光巴士或渡轮。</small>';
+  else if (state.routeStatus === "empty") $("routeSearchStatus").innerHTML = '<strong>这个时间没有找到可用路线，请调整地点或时间</strong>';
+  else if (state.routeOptions.length) $("routeSearchStatus").innerHTML = `<strong>找到 ${state.routeOptions.length} 个方案 · 点击卡片即可在地图比较</strong><small>票价仅在 Google 能确定完整行程时显示</small>`;
+  else $("routeSearchStatus").innerHTML = "";
+  $("routeResults").innerHTML = state.routeOptions.map(renderRouteOption).join("");
+  const showShift = state.routeDraft.travelMode === "TRANSIT" && ["ready","empty"].includes(state.routeStatus);
+  $("routeTimeShift").hidden = !showShift; $("routeTimeShiftLabel").textContent = state.routeDraft.timeMode === "arrival" ? "按到达时间" : "按出发时间";
+  const option = currentRouteOption(); $("routeSavePanel").hidden = !option;
+  $("toggleCustomRoute").textContent = option?.custom && state.activeSavedRouteId ? "✎ 编辑自定义路线" : "＋ 自定义路线";
+  if (option) {
+    const active = routeById(state.activeSavedRouteId); $("saveSelectedRoute").textContent = active ? "更新已保存路线" : "保存到地图和行程";
+    if (!$("routeTitle").value || active) $("routeTitle").value = active?.title || `${state.routeDraft.origin?.name || "起点"} → ${state.routeDraft.destination?.name || "终点"}`;
+    if (active) { $("routeManualCost").value = active.manualCost || ""; $("routeNotes").value = active.notes || ""; }
+  }
+  renderSavedRoutes();
+}
+function saveSelectedRoute() {
+  const option = currentRouteOption(); if (!option) return;
+  const existing = routeById(state.activeSavedRouteId); const id = existing?.id || `route-${Date.now()}`;
+  const saved = { id, title: $("routeTitle").value.trim() || `${state.routeDraft.origin.name} → ${state.routeDraft.destination.name}`,
+    origin: structuredClone(state.routeDraft.origin), destination: structuredClone(state.routeDraft.destination), travelMode: option.travelMode || state.routeDraft.travelMode, queryTravelMode: state.routeDraft.travelMode,
+    timeMode: state.routeDraft.timeMode, dateTime: state.routeDraft.dateTime, transitModes: [...state.routeDraft.transitModes],
+    transitPreference: state.routeDraft.transitPreference, manualCost: $("routeManualCost").value.trim(), notes: $("routeNotes").value.trim(),
+    selectedOption: structuredClone(option), updatedAt: new Date().toISOString() };
+  if (existing) state.savedRoutes[state.savedRoutes.findIndex(route => route.id === id)] = saved; else state.savedRoutes.push(saved);
+  state.activeSavedRouteId = id; saveUserState(); renderAll(); showToast(existing ? "已更新路线" : "路线已保存到地图和行程");
+}
+function activateSavedRoute(id) {
+  const route = routeById(id); if (!route) return;
+  state.activeSavedRouteId = id; state.routeDraft = { origin: structuredClone(route.origin), destination: structuredClone(route.destination), travelMode: route.queryTravelMode || (route.travelMode === "CUSTOM" ? "TRANSIT" : route.travelMode),
+    timeMode: route.timeMode || "departure", dateTime: route.dateTime || "2026-09-05T09:00", transitModes: [...(route.transitModes || [])], transitPreference: route.transitPreference || "" };
+  state.routeOptions = [structuredClone(route.selectedOption)]; state.selectedRouteOption = 0; state.routeStatus = "ready"; state.routeDetailsOpen = new Set();
+  switchView("routes"); syncRouteForm(); $("routeTitle").value = route.title; $("routeManualCost").value = route.manualCost || ""; $("routeNotes").value = route.notes || "";
+  renderRoutePlanner(); renderMap({ fit: true });
+}
+function deleteSavedRoute(id) {
+  state.savedRoutes = state.savedRoutes.filter(route => route.id !== id); if (state.activeSavedRouteId === id) newRoutePlan();
+  saveUserState(); renderAll(); showToast("已删除路线");
+}
+function syncRouteForm() {
+  $("routeOriginSearch").value = state.routeDraft.origin?.name || ""; $("routeDestinationSearch").value = state.routeDraft.destination?.name || "";
+  $("routeTimeMode").value = state.routeDraft.timeMode; $("routeDateTime").value = state.routeDraft.dateTime; $("transitPreference").value = state.routeDraft.transitPreference;
+}
+function newRoutePlan() {
+  state.activeSavedRouteId = null; state.routeOptions = []; state.routeStatus = "idle"; state.selectedRouteOption = 0;
+  state.routeDraft = { origin: null, destination: null, travelMode: "TRANSIT", timeMode: "departure", dateTime: "2026-09-05T09:00", transitModes: [], transitPreference: "" };
+  $("routeTitle").value = ""; $("routeManualCost").value = ""; $("routeNotes").value = ""; $("customRoutePanel").hidden = true; syncRouteForm(); renderRoutePlanner(); renderMap();
+}
+function shiftRouteTime(minutes) {
+  const date = routeRequestDate(); if (!date) return; date.setMinutes(date.getMinutes() + minutes);
+  const local = japanInputFromDate(date); state.routeDraft.dateTime = local; $("routeDateTime").value = local; void searchRoutes();
+}
 
 async function refreshAreaDetails(areaId, { quiet = false } = {}) {
   const area = areaById(areaId); if (!area || !state.placesReady || !area.placeId) return;
@@ -604,7 +964,7 @@ function addPreviewPlace() {
     viewport: viewportJSON(place.viewport), primaryType: place.place_type || "", types: place.types || [], businessStatus: place.business_status || "",
     addressComponents: place.address_components || [], startDate: "", endDate: "", nights: "", note: "", candidateIds: [] });
   state.expandedAreas.clear(); state.expandedAreas.add(id); state.selectedAreaId = id; state.showAreas = true; state.showCandidates = true;
-  dismissPreview(); saveUserState(); renderAll({ fitMap: true }); queueRouteRefresh();
+  dismissPreview(); saveUserState(); renderAll({ fitMap: true });
 }
 function dismissPreview() { state.searchPreview = null; $("placePreview").hidden = true; clearMapLayer(previewLayer); renderMapFocusCard(); }
 
@@ -714,13 +1074,42 @@ function assignCandidateToArea(candidateId, areaId) {
 }
 
 function switchView(view) {
-  state.view = view; state.selectedCandidateId = null; document.querySelectorAll(".panel-tab").forEach(tab => tab.classList.toggle("active", tab.dataset.view === view));
-  $("areasView").classList.toggle("active", view === "areas"); $("candidatesView").classList.toggle("active", view === "candidates");
-  if (view === "candidates") { state.selectedAreaId = null; state.showCandidates = true; } else if (!state.selectedAreaId) state.showCandidates = false;
+  state.view = view; state.selectedCandidateId = null; document.body.classList.toggle("route-view-active", view === "routes"); if (view !== "routes") document.body.classList.remove("route-details-visible"); document.querySelectorAll(".panel-tab").forEach(tab => tab.classList.toggle("active", tab.dataset.view === view));
+  $("areasView").classList.toggle("active", view === "areas"); $("routesView").classList.toggle("active", view === "routes"); $("candidatesView").classList.toggle("active", view === "candidates");
+  if (view === "candidates") { state.selectedAreaId = null; state.showCandidates = true; }
+  else if (view === "routes") { state.selectedAreaId = null; state.showCandidates = false; }
+  else if (!state.selectedAreaId) state.showCandidates = false;
   renderAll({ fitMap: true });
 }
 function setupInteractions() {
   document.querySelectorAll(".panel-tab").forEach(tab => tab.addEventListener("click", () => switchView(tab.dataset.view)));
+  [["routeOriginSearch","origin"],["routeDestinationSearch","destination"]].forEach(([id,target]) => {
+    $(id).addEventListener("input", () => scheduleRouteEndpointSearch(target));
+    $(id).addEventListener("focus", () => { if ($(id).value.trim() && !state.routeDraft[target]) void searchRouteEndpoint(target); });
+    routeEndpointResults(target).addEventListener("click", event => {
+      const local = event.target.closest("[data-route-local-endpoint]"); if (local) return chooseLocalRouteEndpoint(target, Number(local.dataset.routeLocalEndpoint));
+      const live = event.target.closest("[data-route-live-endpoint]"); if (live) return void chooseLiveRouteEndpoint(target, Number(live.dataset.routeLiveEndpoint));
+    });
+  });
+  document.querySelectorAll("[data-clear-route-endpoint]").forEach(button => button.addEventListener("click", () => clearRouteEndpoint(button.dataset.clearRouteEndpoint)));
+  $("swapRouteEndpoints").addEventListener("click", swapRouteEndpoints);
+  $("routeModeTabs").addEventListener("click", event => { const button = event.target.closest("[data-route-mode]"); if (!button) return; state.routeDraft.travelMode = button.dataset.routeMode; if (state.routeDraft.travelMode !== "TRANSIT") { state.routeDraft.timeMode = "departure"; $("routeTimeMode").value = "departure"; } state.routeOptions = []; state.routeStatus = "idle"; renderRoutePlanner(); renderMap(); });
+  $("routeTimeMode").addEventListener("change", event => { state.routeDraft.timeMode = event.target.value; });
+  $("routeDateTime").addEventListener("change", event => { state.routeDraft.dateTime = event.target.value; state.routeOptions = []; state.routeStatus = "idle"; renderRoutePlanner(); renderMap(); });
+  $("transitFilters").addEventListener("click", event => { const button = event.target.closest("[data-transit-mode]"); if (!button) return; state.routeDraft.transitModes = button.dataset.transitMode ? [button.dataset.transitMode] : []; state.routeOptions = []; state.routeStatus = "idle"; renderRoutePlanner(); renderMap(); });
+  $("transitPreference").addEventListener("change", event => { state.routeDraft.transitPreference = event.target.value; state.routeOptions = []; state.routeStatus = "idle"; renderRoutePlanner(); renderMap(); });
+  $("searchRoutes").addEventListener("click", () => void searchRoutes());
+  $("routeTimeShift").addEventListener("click", event => { const button = event.target.closest("[data-shift-route-time]"); if (button) shiftRouteTime(Number(button.dataset.shiftRouteTime)); });
+  $("routeResults").addEventListener("click", event => {
+    const detail = event.target.closest("[data-toggle-route-details]"); if (detail) { const index = Number(detail.dataset.toggleRouteDetails); state.routeDetailsOpen.has(index) ? state.routeDetailsOpen.delete(index) : state.routeDetailsOpen.add(index); return renderRoutePlanner(); }
+    const option = event.target.closest("[data-select-route-option]"); if (option) selectRouteOption(Number(option.dataset.selectRouteOption), { fit: true });
+  });
+  $("saveSelectedRoute").addEventListener("click", saveSelectedRoute);
+  $("savedRoutesList").addEventListener("click", event => { const del = event.target.closest("[data-delete-saved-route]"); if (del) return deleteSavedRoute(del.dataset.deleteSavedRoute); const open = event.target.closest("[data-open-saved-route]"); if (open) activateSavedRoute(open.dataset.openSavedRoute); });
+  $("newRoutePlan").addEventListener("click", newRoutePlan);
+  $("toggleCustomRoute").addEventListener("click", openCustomRouteEditor);
+  $("closeCustomRoute").addEventListener("click", () => { $("customRoutePanel").hidden = true; });
+  $("addCustomRouteOption").addEventListener("click", addCustomRouteOption);
   $("areaSearch").addEventListener("input", scheduleAreaSearch);
   $("areaSearch").addEventListener("keydown", event => { if (event.key === "Escape") { $("areaSearch").value = ""; scheduleAreaSearch(); dismissPreview(); } });
   $("clearAreaSearch").addEventListener("click", () => { $("areaSearch").value = ""; scheduleAreaSearch(); dismissPreview(); $("areaSearch").focus(); });
@@ -756,8 +1145,8 @@ function setupInteractions() {
   $("areaList").addEventListener("dragstart", event => { const card = event.target.closest("[data-area-card]"); if (card) { state.draggedAreaId = card.dataset.areaCard; card.classList.add("dragging"); } });
   $("areaList").addEventListener("dragend", event => { event.target.closest("[data-area-card]")?.classList.remove("dragging"); state.draggedAreaId = null; });
   $("areaList").addEventListener("dragover", event => event.preventDefault());
-  $("areaList").addEventListener("drop", event => { event.preventDefault(); const target = event.target.closest("[data-area-card]")?.dataset.areaCard; if (!target || !state.draggedAreaId || target === state.draggedAreaId) return; const from = state.areas.findIndex(area => area.id === state.draggedAreaId); const to = state.areas.findIndex(area => area.id === target); const [moved] = state.areas.splice(from,1); state.areas.splice(to,0,moved); saveUserState(); renderAll({ fitMap: true }); queueRouteRefresh(true); });
-  $("tripRouteSummary").addEventListener("click", event => { if (event.target.closest("[data-refresh-routes]")) queueRouteRefresh(true); });
+  $("areaList").addEventListener("drop", event => { event.preventDefault(); const target = event.target.closest("[data-area-card]")?.dataset.areaCard; if (!target || !state.draggedAreaId || target === state.draggedAreaId) return; const from = state.areas.findIndex(area => area.id === state.draggedAreaId); const to = state.areas.findIndex(area => area.id === target); const [moved] = state.areas.splice(from,1); state.areas.splice(to,0,moved); saveUserState(); renderAll({ fitMap: true }); });
+  $("tripRouteSummary").addEventListener("click", event => { if (event.target.closest("[data-open-route-planner]")) switchView("routes"); });
   $("closeNearby").addEventListener("click", closeNearby);
   $("nearbyTypeChips").addEventListener("click", event => { const chip = event.target.closest("[data-nearby-type]"); if (!chip) return; state.nearbyType = chip.dataset.nearbyType; void searchNearby(); });
   $("nearbyResults").addEventListener("click", event => { const result = event.target.closest("[data-focus-nearby]"); if (result) return focusNearbyPlace(result.dataset.focusNearby); if (event.target.closest("[data-retry-nearby]")) void searchNearby(); });
@@ -785,7 +1174,7 @@ async function boot() {
     const responses = await Promise.all(paths.map(path => fetch(path))); if (responses.some(response => !response.ok)) throw new Error("数据文件无法读取");
     const [master,locations,batches,catalog] = await Promise.all(responses.map(response => response.json()));
     state.candidates = window.ResearchDataAdapter.buildCandidateViewModels(master,locations,batches); state.catalog = catalog.places || [];
-    loadUserState(); fillCategorySelect($("pickerCategory")); await initMap(); setupInteractions(); renderAll({ fitMap: true }); queueRouteRefresh();
+    loadUserState(); fillCategorySelect($("pickerCategory")); await initMap(); setupInteractions(); syncRouteForm(); renderAll({ fitMap: true });
   } catch (error) {
     $("areaList").innerHTML = `<div class="empty-state"><h3>无法载入地图数据</h3><p>${esc(error.message)}</p></div>`;
   }

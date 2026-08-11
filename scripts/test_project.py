@@ -175,12 +175,24 @@ def main() -> int:
         failures.append("selected live area does not fetch identity, coordinates, viewport, type, status, and address structure")
     if "Place.searchNearby" not in app_text or "includedPrimaryTypes" not in app_text or "data-nearby-type" not in app_text:
         failures.append("on-demand Google Nearby Search exploration is missing")
-    if "Route.computeRoutes" not in app_text or 'travelMode: "DRIVING"' not in app_text or "durationMillis" not in app_text or "distanceMeters" not in app_text:
-        failures.append("ordered itinerary driving distance and duration requests are missing")
+    route_requirements = (
+        "Route.computeRoutes", "computeAlternativeRoutes", 'travelMode === "TRANSIT"',
+        "transitPreference", "allowedTransitModes", "FEWER_TRANSFERS", "LESS_WALKING",
+        "departureTime", "arrivalTime", "transitDetails", "transitFare", "headwayMillis",
+        "savedRoutes", "selectRouteOption", "activateSavedRoute", "routeDetailsOpen",
+        "routes.googleapis.com/directions/v2:computeRoutes", "computeTransitRoutesREST", "GEO_JSON_LINESTRING",
+        "DirectionsService", "computeTransitDirectionsLegacy", "provideRouteAlternatives",
+    )
+    if any(requirement not in app_text + index_text for requirement in route_requirements):
+        failures.append("two-place multimodal route search, comparison, schedules, or saved-map routes are incomplete")
+    custom_route_requirements = ("addCustomRouteOption", "openCustomRouteEditor", "编辑自定义路线", "customRouteName", "customRouteCost", "customStops", "custom: true", "dashed: Boolean")
+    if any(requirement not in app_text + index_text for requirement in custom_route_requirements):
+        failures.append("custom transport routes for unlisted buses, ferries, or shuttles are incomplete")
     if "loadCandidateGoogleDetails" not in app_text or "regularOpeningHours" not in app_text or "userRatingCount" not in app_text or "accessibilityOptions" not in app_text:
         failures.append("on-demand Google Candidate details are missing")
-    if "tripRouteSummary" not in index_text or "nearbySheet" not in index_text:
-        failures.append("route summary or nearby exploration UI is missing")
+    route_ui = ("tripRouteSummary", "routesView", "routeOriginSearch", "routeDestinationSearch", "routeModeTabs", "routeResults", "savedRoutesList", "customRoutePanel")
+    if any(element not in index_text for element in route_ui) or "nearbySheet" not in index_text:
+        failures.append("route planner, saved route, custom route, or nearby exploration UI is missing")
     if 'mapProvider = "google"' not in app_text or 'importLibrary("maps")' not in app_text:
         failures.append("Google Places results are not paired with a Google map")
     if "initLeafletMap" not in app_text or "无法正确加载 Google 地图" not in app_text:
