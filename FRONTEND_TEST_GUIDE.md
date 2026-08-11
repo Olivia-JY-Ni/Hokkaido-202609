@@ -4,6 +4,16 @@ Target branch: `agent/trip-planner-ui-v1`
 
 This branch changes the planner interaction model without replacing the existing map, Google Places, or NAVITIME engines. Test in a real browser with the same Google Maps / NAVITIME setup used by the current app.
 
+## 0. Blocker regression retest
+
+These three regressions were found in the first browser pass and must all be retested before merge:
+
+1. **Tab isolation:** start on `行程`, switch repeatedly among `我的地区` and `全部候选地点`. Exactly one `.panel-view` may remain visible/active; `行程` must never remain underneath another view.
+2. **Candidate count consistency:** the header Candidate count, the `全部` category chip, and the unfiltered Candidate list must use the same atomic-Candidate population. Regional Modules must not be included in any of those three counts.
+3. **Candidate map focus:** from `全部候选地点`, click several Candidates with verified coordinates. After clicking, wait at least 1 second. The map must still be centered on the Candidate at close zoom (target 13, never silently returning to the Hokkaido-wide bounds). Repeat with a Candidate opened through `详情` and through an area's expanded Candidate row.
+
+Do not merge if any of these three regressions remains.
+
 ## 1. Startup and data safety
 
 - App loads without console errors in both Google Maps mode and Leaflet fallback if practical.
