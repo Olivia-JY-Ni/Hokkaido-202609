@@ -1,0 +1,8 @@
+/* Browser regression fixes for itinerary UI round 2. */
+@media (max-width:720px){
+  body .planner-sidebar-controls,
+  body.planner-sidebar-narrow .planner-sidebar-controls,
+  body.planner-sidebar-collapsed .planner-sidebar-controls{
+    display:none!important;
+  }
+}
