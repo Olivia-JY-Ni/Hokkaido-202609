@@ -259,19 +259,20 @@
       ]
     },
     {
-      "place_id": "ChIJOU_nKlvDbF8RHfNekp0elQA",
-      "name_zh": "斜里 / 知床",
-      "google_title": "斜里町",
-      "formatted_address": "日本、北海道斜里郡斜里町",
-      "lat": 43.9114765,
-      "lon": 144.6707651,
+        "place_id": "ChIJMznhdZLDbF8RK07Nbn0ZfWU",
+        "name_zh": "知床",
+        "google_title": "知床世界遺産センター",
+        "formatted_address": "日本、〒099-4354 北海道斜里郡斜里町ウトロ西１８６−１０ 知床世界遺産センター",
+        "lat": 44.0694826,
+        "lon": 144.991301,
       "place_type": "city_or_area",
       "provider": "Google Maps",
       "verified_at": "2026-08-10T17:59:52+08:00",
       "search_terms": [
-        "斜里 / 知床",
-        "斜里町",
-        "斜里町 北海道"
+          "知床",
+          "ウトロ",
+          "知床世界遺産センター",
+          "知床 北海道"
       ]
     },
     {

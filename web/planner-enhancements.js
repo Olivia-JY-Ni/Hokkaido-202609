@@ -57,6 +57,7 @@
     return item?.candidate?.entity_type === "regional_module" || item?.candidate?.candidate_type === "regional_module";
   }
   function additionToViewModel(candidate) {
+    const location = state.candidateLocations?.get(candidate.candidate_id) || { verification_status: "unresolved" };
     return {
       id: candidate.candidate_id,
       candidate,
@@ -77,7 +78,7 @@
       visual: { assets: [] },
       sourcePacks: {},
       provenance: [], originalRecords: [], historicalAssessment: null, relationships: {},
-      location: { verification_status: "unresolved" }, original: {}, uncertainties: [], dynamicRechecks: [], level2Attention: [], conflicts: [],
+      location, original: {}, uncertainties: [], dynamicRechecks: [], level2Attention: [], conflicts: [],
       latestOverlay: null, dynamicRecheckRequired: false, hasVisualEvidence: false, hasUncertainty: false,
       plannerOverlay: true,
     };
@@ -271,6 +272,27 @@
     return [...modules.values()];
   }
   function regionCatalogPlace(module) {
+    const locationAnchors = {
+      "RM-SHR": "RM-SHR",
+      "RM-DAI": "HKD-DAI-001",
+      "RM-FUR": "R3-BIE-001",
+      "RM-JOZ": "R3-SAP-001",
+    };
+    const anchor = state.candidateLocations?.get(locationAnchors[module.module_id]);
+    if (anchor?.verification_status === "verified" && Number.isFinite(anchor.lat) && Number.isFinite(anchor.lon)) {
+      const name = (module.name_zh || module.region || module.module_id).replace(/区域模块$/, "");
+      return {
+        place_id: anchor.provider_place_id,
+        name_zh: name,
+        google_title: anchor.google_title || name,
+        formatted_address: anchor.formatted_address || module.region || "北海道",
+        lat: anchor.lat,
+        lon: anchor.lon,
+        place_type: "city_or_area",
+        provider: anchor.provider || "Google Maps",
+        search_terms: [name, module.region].filter(Boolean),
+      };
+    }
     const haystack = `${module.name_zh || ""} ${module.region || ""}`.replace(/区域模块/g, "");
     const matches = state.catalog.filter(place => {
       const names = [place.name_zh, place.google_title, ...(place.search_terms || [])].filter(Boolean);

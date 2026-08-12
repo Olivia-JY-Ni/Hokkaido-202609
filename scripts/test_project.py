@@ -125,6 +125,7 @@ def main() -> int:
         failures.append("exact-ID validation did not reject a missing/unexpected candidate")
 
     app_text = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
+    enhancements_text = (ROOT / "web" / "planner-enhancements.js").read_text(encoding="utf-8")
     styles_text = (ROOT / "web" / "styles.css").read_text(encoding="utf-8")
     adapter_text = (ROOT / "web" / "data-adapter.js").read_text(encoding="utf-8")
     index_text = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
@@ -142,6 +143,13 @@ def main() -> int:
         failures.append("web app still loads preset areas or automatic Candidate assignments")
     if "area-map-marker" not in index_text + app_text or "⭐" not in app_text:
         failures.append("star-only itinerary area marker is missing")
+    if "googleAreaIcon(isSelected," in app_text or "areaIcon(isSelected," in app_text:
+        failures.append("filled itinerary stars are still muted when another area is selected")
+    if "planner_overlay_locations" not in app_text or "state.candidateLocations" not in enhancements_text:
+        failures.append("planner Candidate coordinate overlay is not wired into the frontend")
+    required_module_anchors = ('"RM-SHR": "RM-SHR"', '"RM-DAI": "HKD-DAI-001"', '"RM-FUR": "R3-BIE-001"', '"RM-JOZ": "R3-SAP-001"')
+    if any(anchor not in enhancements_text for anchor in required_module_anchors):
+        failures.append("regional research modules do not use explicit verified map anchors")
     if "data-toggle-area-candidates" not in app_text or "aria-expanded" not in app_text:
         failures.append("quick Candidate expand/collapse control is missing from area cards")
     if "data-open-picker" not in app_text or "pickerSelection" not in app_text or "areaForCandidate" not in app_text:

@@ -3,7 +3,7 @@ const NAVITIME_KEY_STORAGE = "hokkaido-navitime-rapidapi-key";
 const NAVITIME_QUOTA_STORAGE = "hokkaido-navitime-quota";
 const NAVITIME_HOST = "navitime-route-totalnavi.p.rapidapi.com";
 const state = {
-  candidates: [], customCandidates: [], candidatePlans: {}, catalog: [], areas: [], view: "areas", selectedAreaId: null,
+  candidates: [], customCandidates: [], candidatePlans: {}, candidateLocations: new Map(), catalog: [], areas: [], view: "areas", selectedAreaId: null,
   selectedCandidateId: null,
   expandedAreas: new Set(), showAreas: true, showCandidates: false,
   candidateQuery: "", candidateCategory: "", candidateUnassignedOnly: false,
@@ -297,18 +297,18 @@ function clearMapLayer(layer) {
     layer.clearLayers();
   }
 }
-function areaIcon(selected = false, muted = false) {
-  return L.divIcon({ className: `area-map-marker${selected ? " is-selected" : ""}${muted ? " is-muted" : ""}`, html: '<span aria-label="行程地区">⭐</span>', iconSize: selected ? [38,38] : [32,32], iconAnchor: selected ? [19,32] : [16,27] });
+function areaIcon(selected = false) {
+  return L.divIcon({ className: `area-map-marker${selected ? " is-selected" : ""}`, html: '<span aria-label="行程地区">⭐</span>', iconSize: selected ? [38,38] : [32,32], iconAnchor: selected ? [19,32] : [16,27] });
 }
-function googleAreaIcon(selected = false, muted = false) {
+function googleAreaIcon(selected = false) {
   return {
     icon: {
       path: google.maps.SymbolPath.CIRCLE, scale: selected ? 19 : 16,
-      fillColor: selected ? "#ffefd0" : "#e8f2ee", fillOpacity: muted ? .55 : 1,
+      fillColor: selected ? "#ffefd0" : "#e8f2ee", fillOpacity: 1,
       strokeColor: "#ffffff", strokeWeight: 2,
     },
     label: { text: "⭐", fontSize: selected ? "21px" : "18px" },
-    opacity: muted ? .48 : 1,
+    opacity: 1,
   };
 }
 function renderLegend(items) {
@@ -380,11 +380,11 @@ function renderMap({ fit = false } = {}) {
       if (mapProvider === "google") {
         marker = new google.maps.Marker({
           position: { lat: area.lat, lng: area.lon }, map, title: area.name,
-          zIndex: isSelected ? 1000 : 500, ...googleAreaIcon(isSelected, Boolean(selected && !isSelected)),
+          zIndex: isSelected ? 1000 : 500, ...googleAreaIcon(isSelected),
         });
         marker.addListener("click", () => selectArea(area.id)); areaLayer.push(marker);
       } else {
-        marker = L.marker([area.lat, area.lon], { icon: areaIcon(isSelected, Boolean(selected && !isSelected)), zIndexOffset: isSelected ? 1000 : 500 });
+        marker = L.marker([area.lat, area.lon], { icon: areaIcon(isSelected), zIndexOffset: isSelected ? 1000 : 500 });
         marker.bindTooltip(area.name, { direction: "top", offset: [0,-23] });
         marker.on("click", () => selectArea(area.id)); marker.addTo(areaLayer);
       }
@@ -1547,6 +1547,10 @@ async function boot() {
     const paths = ["../data/hokkaido_places_master.json","../data/candidate_locations.json","../data/research_batches_level1.json","../data/google_maps_area_catalog.json"];
     const responses = await Promise.all(paths.map(path => fetch(path))); if (responses.some(response => !response.ok)) throw new Error("数据文件无法读取");
     const [master,locations,batches,catalog] = await Promise.all(responses.map(response => response.json()));
+    state.candidateLocations = new Map([
+      ...(locations.locations || []),
+      ...(locations.planner_overlay_locations || []),
+    ].map(location => [location.candidate_id, location]));
     state.candidates = window.ResearchDataAdapter.buildCandidateViewModels(master,locations,batches); state.catalog = catalog.places || [];
     loadUserState(); loadNavitimeQuota(); fillCategorySelect($("pickerCategory")); fillCategorySelect($("customCandidateCategory")); await initMap(); setupInteractions(); syncRouteForm(); renderAll({ fitMap: true });
   } catch (error) {

@@ -11,6 +11,9 @@
 @media(max-width:950px){.planner-shell{grid-template-columns:330px minmax(0,1fr)}.map-search-wrap{width:calc(100% - 190px);left:18px;transform:none}.map-layer-controls{top:72px;right:12px;flex-direction:column}.header-stats{display:none}}
 @media(max-width:700px){body{overflow:hidden}.app-header{height:58px;padding:0 12px}.brand-block p{display:none}.planner-shell{height:calc(100vh - 58px);display:block}.planner-panel{position:absolute;z-index:1000;left:8px;right:8px;bottom:8px;height:44%;border:0;border-radius:18px;box-shadow:var(--shadow)}.map-stage{height:100%}.map-search-wrap{top:10px;left:10px;width:calc(100% - 20px)}.map-layer-controls{top:68px;right:10px;flex-direction:row}.place-preview,.map-focus-card{left:10px;bottom:calc(44% + 18px);width:calc(100% - 20px)}.map-legend{display:none!important}.area-editor{grid-template-columns:1fr}.area-editor .wide,.delete-area{grid-column:1}.detail-dialog{width:100%}.candidate-picker{width:100%}.panel-heading{padding-top:16px}.area-summary{padding-top:11px}.area-candidate-row{padding:8px}.leaflet-control-zoom{margin-top:120px!important}}
 
+/* Filled itinerary stars stay fully visible; only hollow research stars may recede. */
+.area-map-marker.is-muted{filter:drop-shadow(0 4px 4px rgba(31,42,38,.32));opacity:1}
+
 /* 2026-08 UX refresh: trip-first hierarchy and list-map selection feedback */
 .planner-shell{grid-template-columns:400px minmax(0,1fr)}
 .planner-panel{background:#f7f8f7}

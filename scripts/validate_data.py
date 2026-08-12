@@ -19,6 +19,7 @@ LOCATION_REVIEW_PATH = ROOT / "data" / "google_maps_coordinate_review_current.js
 LEGACY_MASTER_PATH = ROOT / "data" / "history" / "places_master_legacy_42.json"
 AREA_CATALOG_PATH = ROOT / "data" / "google_maps_area_catalog.json"
 ROUTES_PATH = ROOT / "data" / "routes.json"
+PLANNER_OVERLAY_PATH = ROOT / "data" / "planner_overlay_20260811.json"
 
 EXPECTED_TOTAL = 77
 EXPECTED_ELIGIBLE = 73
@@ -26,6 +27,7 @@ EXPECTED_AGGREGATES = 4
 EXPECTED_CHALLENGERS = 12
 EXPECTED_BATCHES = 10
 EXPECTED_VERIFIED_COORDINATES = 77
+EXPECTED_PLANNER_OVERLAY_COORDINATES = 14
 EXPECTED_AGGREGATE_IDS = {"RM-SAP", "RM-ASH", "RM-SHR", "RM-KUS"}
 DISTINCT_KUSHIRO_PAIR = {"R2-KUS-004", "R2-KUS-005"}
 LEGAL_CATEGORIES = {
@@ -61,6 +63,7 @@ def validate(external_master: Path | None = None) -> list[str]:
     legacy_master = load_json(LEGACY_MASTER_PATH)
     area_catalog = load_json(AREA_CATALOG_PATH)
     routes = load_json(ROUTES_PATH)
+    planner_overlay = load_json(PLANNER_OVERLAY_PATH)
     candidates = master.get("candidates", [])
 
     ids = [row.get("candidate_id") for row in candidates]
@@ -178,6 +181,33 @@ def validate(external_master: Path | None = None) -> list[str]:
         errors.append(
             f"verified coordinates: expected {EXPECTED_VERIFIED_COORDINATES}, got {verified_count}"
         )
+
+    planner_location_rows = locations.get("planner_overlay_locations", [])
+    planner_location_ids = [row.get("candidate_id") for row in planner_location_rows]
+    planner_candidate_ids = {
+        row.get("candidate_id") for row in planner_overlay.get("candidate_additions", [])
+    }
+    if (
+        len(planner_location_rows) != EXPECTED_PLANNER_OVERLAY_COORDINATES
+        or set(planner_location_ids) != planner_candidate_ids
+        or len(set(planner_location_ids)) != len(planner_location_ids)
+        or set(planner_location_ids) & id_set
+    ):
+        errors.append("planner coordinate overlay must contain exactly one separate row for every planner Candidate addition")
+    for row in planner_location_rows:
+        cid = row.get("candidate_id", "<missing>")
+        if not required_location_keys.issubset(row):
+            errors.append(f"{cid}: planner location row is missing required fields")
+            continue
+        if row.get("verification_status") != "verified":
+            errors.append(f"{cid}: planner coordinate must be Google Maps verified")
+        if not isinstance(row.get("lat"), (int, float)) or not -90 <= row["lat"] <= 90:
+            errors.append(f"{cid}: invalid planner latitude")
+        if not isinstance(row.get("lon"), (int, float)) or not -180 <= row["lon"] <= 180:
+            errors.append(f"{cid}: invalid planner longitude")
+        for key in ("scope", "provider", "provider_place_id", "source_url", "verified_at"):
+            if not row.get(key):
+                errors.append(f"{cid}: verified planner coordinate missing {key}")
 
     review_rows = location_review.get("results", [])
     legacy_ids = {row["unique_id"] for row in legacy_master.get("records", [])}
